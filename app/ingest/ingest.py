@@ -4,7 +4,17 @@ from app.embed import get_embedding
 from app.vector_store import init_collection, store_embeddings
 from app.vector_store import search
 from app.vector_store import close_client
+from app.vector_store import init_collection, store_embeddings
 
+def ingest_codebase(folder_path):
+    data = ingest(folder_path)
+
+    if data:
+        vector_size = len(data[0]["embedding"])
+        init_collection(vector_size)
+        store_embeddings(data)
+
+    return len(data)
 
 
 

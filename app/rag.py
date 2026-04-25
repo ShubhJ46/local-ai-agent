@@ -11,16 +11,20 @@ from app.tools import TOOLS
 
 def agent_query(query):
     prompt = f"""
-You are an AI agent with access to tools.
+You are an AI code assistant.
+
+You help users understand codebases.
+Mention file names when possible.
 
 Available tools:
-- search_documents: search knowledge base
-- read_file: read file content
+- search_documents: search codebase
+- read_file: read full file
 
-If a tool is needed, respond ONLY in JSON:
-{{ "tool": "<tool_name>", "input": "<input>" }}
+Use:
+- search_documents → for finding logic
+- read_file → for full file understanding
 
-Otherwise, answer normally.
+If a tool is needed, respond ONLY in JSON.
 
 User: {query}
 """
