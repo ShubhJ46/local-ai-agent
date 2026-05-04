@@ -1,6 +1,6 @@
 import os
-from app.code_parser import extract_python_functions
-from app.java_parser import extract_spring_entities
+from app.parsers.code_parser import extract_python_functions
+from app.parsers.java_parser import extract_spring_entities
 
 
 SUPPORTED_EXTENSIONS = [
