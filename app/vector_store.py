@@ -37,16 +37,57 @@ def store_embeddings(chunks):
 def close_client():
     client.close()
 
-def search(query_embedding, top_k=5):
+def     search(query_embedding, top_k=5, filter=None):
     results = client.query_points(
         collection_name=COLLECTION_NAME,
         query=query_embedding,
-        limit=top_k
+        limit=top_k * 3
     ).points
 
-    filtered = [
-        hit.payload for hit in results
-        if hit.payload["metadata"]["file_name"].endswith((".cpp", ".py"))
-    ]
+    formatted = []
 
-    return filtered[:top_k]
+    for hit in results:
+        payload = hit.payload
+        metadata = payload.get("metadata", {})
+
+        if metadata.get("type") == "endpoint":
+            if not metadata.get("endpoint"):
+                continue
+
+        # Optional filtering 
+        if filter:
+            skip = False
+            for k, v in filter.items():
+                if metadata.get(k) != v:
+                    skip = True
+                    break
+            if skip:
+                continue
+
+        item = {
+            "text": payload.get("text"),
+            "file": metadata.get("file_name"),
+            "type": metadata.get("type"),
+            "name": metadata.get("name"),
+            "path": metadata.get("path"),
+            "annotations": metadata.get("annotations", []),
+            "endpoint": metadata.get("endpoint"),
+            "http_method": metadata.get("http_method"),
+        }
+
+        formatted.append(item)
+
+    # Smart ranking
+    def score(x):
+        if x["type"] == "endpoint":
+            return 0
+        elif x["type"] in ("method", "function"):
+            return 1
+        elif x["type"] == "class":
+            return 2
+        else:
+            return 3
+
+    formatted.sort(key=score)
+
+    return formatted[:top_k]

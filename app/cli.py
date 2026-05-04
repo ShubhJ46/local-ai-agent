@@ -1,5 +1,7 @@
 from app.rag import agent_query
 from app.ingest.ingest import ingest_codebase
+from app.vector_store import close_client
+
 
 def main():
     print("🧠 Local AI Code Agent")
@@ -21,6 +23,8 @@ def main():
 
         response = agent_query(query)
         print("\nAgent:", response, "\n")
+        close_client()
 
 if __name__ == "__main__":
     main()
+    close_client()

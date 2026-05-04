@@ -1,118 +1,202 @@
+import json
+import re
+
 from app.embed import get_embedding
 from app.vector_store import search
 from app.llm import query_llm
-from app.memory import ShortTermMemory, retrieve_memory
-from app.memory import store_memory
-from app.memory import init_memory_collection
+from app.tools import TOOLS, rerank, rewrite_query
 
-import json
-from app.llm import query_llm
-from app.tools import TOOLS
+from app.memory import ShortTermMemory, retrieve_memory, store_memory, init_memory_collection
 
-def agent_query(query):
-    prompt = f"""
+
+# ---------------------------
+# Helpers
+# ---------------------------
+
+def extract_json(text):
+    """Safely extract first JSON object from LLM output."""
+    match = re.search(r"\{.*?\}", text, re.DOTALL)
+    if not match:
+        return None
+    try:
+        return json.loads(match.group())
+    except:
+        return None
+
+
+def format_context(results):
+    """Convert retrieved docs into structured context for LLM."""
+    context_blocks = []
+
+    for r in results:
+        if r.get("type") == "endpoint":
+            block = f"""Endpoint: {r.get('http_method')} {r.get('endpoint')}
+Method: {r.get('name')}
+File: {r.get('file')}"""
+        else:
+            block = f"""{r.get('type', '').upper()}: {r.get('name')}
+File: {r.get('file')}"""
+
+        context_blocks.append(block)
+
+    return "\n\n".join(context_blocks)
+
+
+# ---------------------------
+# Main Agent (RAG + Tools)
+# ---------------------------
+
+memory = ShortTermMemory()
+
+
+def agent_query(query, max_steps=3, top_k=5):
+    """
+    Hybrid RAG + Agent:
+    1. Retrieve context
+    2. Let LLM decide (use context or tools)
+    3. Loop for multi-step reasoning
+    """
+
+    rewritten_query = rewrite_query(query)
+
+    print("Original query:", query)
+    print("Rewritten query:", rewritten_query)
+
+
+    # ---------------------------
+    # Step 1: Retrieve context
+    # ---------------------------
+    query_embedding = get_embedding(rewritten_query)
+
+    doc_results = search(
+        query_embedding,
+        top_k=top_k,
+        filter={"type": "endpoint"}  # focus on endpoints first
+    )
+
+    if not doc_results:
+        return TOOLS["find_endpoint"](query)
+
+    if not doc_results:
+        doc_results = search(
+            query_embedding,
+            top_k=top_k  # no filter
+        )
+    doc_results = rerank(doc_results, query)
+    doc_context = format_context(doc_results)
+
+    # Optional debug
+    print("\n===== DEBUG: RETRIEVED CONTEXT =====")
+    print(doc_context if doc_context else "No context found")
+    print("====================================\n")
+
+    # ---------------------------
+    # Step 2: Memory 
+    # ---------------------------
+    init_memory_collection(len(query_embedding))
+
+    past_memory = retrieve_memory(query)
+    memory_context = "\n".join(past_memory)
+
+    chat_context = memory.get_context()
+
+    # ---------------------------
+    # Step 3: Initial Prompt
+    # ---------------------------
+    current_prompt = f"""
 You are an AI code assistant.
 
-You help users understand codebases.
-Mention file names when possible.
+You MUST use the provided context to answer.
+Do NOT guess or invent information.
 
-Available tools:
-- search_documents: search codebase
-- read_file: read full file
+---
 
-Use:
-- search_documents → for finding logic
-- read_file → for full file understanding
+CONTEXT:
+{doc_context}
 
-If a tool is needed, respond ONLY in JSON.
+---
 
-User: {query}
+PAST MEMORY:
+{memory_context}
+
+---
+
+CHAT HISTORY:
+{chat_context}
+
+---
+
+TOOLS:
+search_documents(input: string)
+read_file(input: string)
+find_endpoint(input: string)
+
+---
+
+RULES:
+- If answer is already in context or tool result → return FINAL_ANSWER
+- DO NOT call tools again if you already have enough information
+- Only call another tool if critical information is missing
+
+FORMAT:
+{{ "tool": "<tool_name>", "input": "<string>" }}
+
+User Question:
+{query}
 """
 
-    response = query_llm(prompt)
+    # ---------------------------
+    # Step 4: Agent Loop
+    # ---------------------------
+    for step in range(max_steps):
+        response = query_llm(current_prompt)
 
-    # Try parsing tool call
-    try:
-        tool_call = json.loads(response)
-        tool_name = tool_call["tool"]
-        tool_input = tool_call["input"]
+        # Case 1: Final Answer
+        if "FINAL_ANSWER:" in response:
+            final_answer = response.split("FINAL_ANSWER:")[-1].strip()
 
-        if tool_name in TOOLS:
-            tool_result = TOOLS[tool_name](tool_input)
+            # store memory
+            memory.add("User", query)
+            memory.add("AI", final_answer)
+            # store_memory(f"User: {query}\nAI: {final_answer}")
 
-            # Second pass to LLM with tool result
-            final_prompt = f"""
+            return final_answer
+
+        # Case 2: Tool call
+        tool_call = extract_json(response)
+
+        if tool_call:
+            tool_name = tool_call.get("tool")
+            tool_input = tool_call.get("input")
+
+            if tool_name in TOOLS and tool_input:
+                tool_result = TOOLS[tool_name](tool_input)
+
+                current_prompt = f"""
+You are an AI code assistant.
+
+User Question:
+{query}
+
+Existing Context:
+{doc_context}
+
 You used tool: {tool_name}
 
 Tool result:
 {tool_result}
 
-Now answer the user question clearly.
+---
 
-Question:
-{query}
-
-Answer:
-"""
-            return query_llm(final_prompt)
-
-    except:
-        pass
-
-    return response
-
-memory = ShortTermMemory()
-
-def answer_query(query, top_k=5):
-    query_embedding = get_embedding(query)
-
-    # initialize memory collection if needed
-    init_memory_collection(len(query_embedding))
-    # 1. Retrieve document context
-    query_embedding = get_embedding(query)
-    doc_results = search(query_embedding, top_k=top_k)
-    doc_context = "\n\n".join([r["text"] for r in doc_results])
-
-    # 2. Retrieve long-term memory
-    past_memory = retrieve_memory(query)
-    memory_context = "\n".join(past_memory)
-
-    # 3. Short-term memory
-    chat_context = memory.get_context()
-
-    # 4. Build prompt
-    prompt = f"""
-You are an AI assistant with memory.
-
-Conversation so far:
-{chat_context}
-
-Relevant past memory:
-{memory_context}
-
-Relevant documents:
-{doc_context}
-
-Answer clearly and concisely.
-Avoid repeating the same information.
-Ignore any unrelated context.
-
-If multiple documents are present, focus only on relevant parts.
-
-Question:
-{query}
-
-Answer:
+RULES:
+- Prefer existing context if sufficient
+- If more info needed → call another tool
+- If enough → return FINAL_ANSWER
 """
 
-    # 5. Get response
-    response = query_llm(prompt)
+                continue
 
-    # 6. Store in short-term memory
-    memory.add("User", query)
-    memory.add("AI", response)
+        # Fallback (bad format / no tool / hallucination)
+        return response.strip()
 
-    # 7. Store in long-term memory
-    store_memory(f"User: {query}\nAI: {response}")
-
-    return response
+    return "Max steps reached without final answer."
