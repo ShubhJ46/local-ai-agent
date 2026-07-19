@@ -47,6 +47,7 @@ def load_documents(folder_path: str) -> list[dict]:
                             "type": "class",
                             "name": entity["name"],
                             "class": entity["name"],
+                            "kind": entity.get("kind", "class"),
                             "annotations": entity.get("annotations", []),
                             "start_line": entity.get("start_line"),
                             "end_line": entity.get("end_line"),

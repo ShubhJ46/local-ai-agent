@@ -4,9 +4,9 @@ A local-first codebase assistant that indexes source code with AST-aware metadat
 
 ## What it does today
 
-- Extracts Python functions and Spring Java endpoint metadata with Tree-sitter.
-- Indexes supported source and text files into embedded Qdrant.
-- Retrieves relevant code with semantic search and lightweight metadata-aware reranking.
+- Extracts Python functions and Spring Java types, methods, and endpoint routes with Tree-sitter.
+- Embeds each AST unit whole, with its symbol, route, and line range as metadata.
+- Retrieves with hybrid search: dense vectors fused with BM25, then prioritised by symbol type.
 - Sends retrieved source, paths, symbols, and endpoint details to a local LLM for grounded answers.
 - Provides a terminal workflow for indexing a repository and asking questions.
 - Includes offline tests, linting, CI, and a versioned retrieval evaluation harness.
@@ -15,12 +15,45 @@ A local-first codebase assistant that indexes source code with AST-aware metadat
 
 ```text
 CLI question
-  -> query rewrite
-  -> Ollama embedding
-  -> Qdrant semantic retrieval
-  -> metadata reranking
-  -> source-grounded Ollama response
+  -> Ollama embedding ---> Qdrant vector search --.
+  |                                                >-- reciprocal rank fusion
+  '-> tokenisation ------> BM25 lexical search ---'         |
+                                                            v
+                                                    type prioritisation
+                                                    (endpoint > method
+                                                     > class > file)
+                                                            |
+                                                            v
+                                              source-grounded Ollama response
 ```
+
+## Retrieval quality
+
+Measured against [spring-petclinic](https://github.com/spring-projects/spring-petclinic)
+(pinned revision, 115 indexed chunks) using 30 questions in
+`evaluation/retrieval_cases.json`, at k=5:
+
+| Configuration | Recall@5 | MRR |
+| --- | --- | --- |
+| Vector only | 76.7% | 0.594 |
+| BM25 only | 50.0% | 0.354 |
+| **Hybrid (shipped)** | **86.7%** | **0.662** |
+
+Endpoint-navigation questions reach 100% Recall@5. The starting point before
+this work — character-window chunking with keyword reranking — scored 70.0% /
+0.503, so hybrid retrieval over whole AST units is worth **+16.7 points of
+recall and +32% MRR**.
+
+Reproduce it yourself:
+
+```bash
+./scripts/fetch_eval_corpus.sh
+python3 -m scripts.evaluate_retrieval .eval-corpus/spring-petclinic/src/main
+```
+
+A sweep over fusion parameters (candidate pool size, RRF damping) found no
+setting that reliably beat the defaults, so the shipped constants are the
+standard ones rather than values fitted to this question set.
 
 ## Quick start
 
@@ -55,16 +88,26 @@ Python functions and Spring Java controllers receive structured metadata. C/C++,
 ```bash
 ruff check .
 pytest
-python3 -m scripts.evaluate_retrieval data
+./scripts/fetch_eval_corpus.sh
+python3 -m scripts.evaluate_retrieval .eval-corpus/spring-petclinic/src/main
 ```
 
-The evaluation command reports Recall@k and MRR against `evaluation/retrieval_cases.json`. Add representative questions from a real target codebase before publishing any metrics.
+Tests are fully offline — Ollama calls are mocked — so `ruff` and `pytest` gate
+CI. The evaluation command needs a running Ollama and reports Recall@k and MRR
+per retriever and per question category.
+
+## Known limitations
+
+- Only Python and Java have AST extractors. C/C++, JavaScript, TypeScript, Markdown, and text files are indexed as whole-file documents.
+- Embedding is one request per chunk, so first-time indexing of a large repository is slow.
+- Re-indexing replaces the collection, so only one codebase is searchable at a time.
+- The BM25 index is held in memory and rebuilt from the vector store on first query.
 
 ## Roadmap
 
-- Hybrid lexical + vector retrieval with reciprocal-rank fusion.
+- Batched, incremental indexing keyed on content hashes.
 - Call graph extraction (controller -> service -> repository).
-- Precise citations with file and line ranges.
+- Line-range citations surfaced in the answer text, not just in retrieval metadata.
 - More language extractors and a browser UI.
 
 ## Project story

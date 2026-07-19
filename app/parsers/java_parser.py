@@ -5,6 +5,16 @@ from tree_sitter_languages import get_language
 
 from app.parsers import node_lines, node_text
 
+# Spring repositories are interfaces, configuration is often an enum or record,
+# and all of them are top-level declarations a developer navigates to. Indexing
+# only class_declaration made them invisible.
+CONTAINER_DECLARATIONS = {
+    "class_declaration": "class",
+    "interface_declaration": "interface",
+    "enum_declaration": "enum",
+    "record_declaration": "record",
+}
+
 HTTP_METHOD_BY_ANNOTATION = {
     "GetMapping": "GET",
     "PostMapping": "POST",
@@ -48,21 +58,22 @@ def extract_java_entities(code):
     results = []
 
     def traverse(node):
-        if node.type in ("class_declaration", "method_declaration"):
+        if node.type in CONTAINER_DECLARATIONS or node.type == "method_declaration":
             name_node = node.child_by_field_name("name")
             if name_node is None:
                 return
+            is_container = node.type in CONTAINER_DECLARATIONS
             start_line, end_line = node_lines(node)
             results.append(
                 {
-                    "type": "class" if node.type == "class_declaration" else "method",
+                    "type": "class" if is_container else "method",
                     "name": node_text(source, name_node),
                     "text": node_text(source, node),
                     "start_line": start_line,
                     "end_line": end_line,
                 }
             )
-            if node.type == "class_declaration":
+            if is_container:
                 return
         for child in node.children:
             traverse(child)
@@ -88,7 +99,7 @@ def extract_spring_entities(code):
         return annotations
 
     def traverse(node):
-        if node.type == "class_declaration":
+        if node.type in CONTAINER_DECLARATIONS:
             name_node = node.child_by_field_name("name")
             if not name_node:
                 return
@@ -103,6 +114,7 @@ def extract_spring_entities(code):
             results.append(
                 {
                     "type": "class",
+                    "kind": CONTAINER_DECLARATIONS[node.type],
                     "name": node_text(source, name_node),
                     "base_path": base_path,
                     "annotations": annotations,

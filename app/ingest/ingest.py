@@ -1,6 +1,7 @@
 from app.chunker import chunk_code_unit, chunk_text
 from app.embed import get_embedding
 from app.loader import load_documents
+from app.retrieval import reset_lexical_index
 from app.vector_store import init_collection, store_embeddings
 
 # Documents the AST already reduced to a single meaningful unit. These are
@@ -15,6 +16,8 @@ def ingest_codebase(folder_path):
         vector_size = len(data[0]["embedding"])
         init_collection(vector_size)
         store_embeddings(data)
+        # The lexical index is derived from the collection, so it is stale now.
+        reset_lexical_index()
 
     return len(data)
 
