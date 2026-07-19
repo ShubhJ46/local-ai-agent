@@ -1,9 +1,11 @@
 import re
 
-from tree_sitter import Parser
-from tree_sitter_languages import get_language
+import tree_sitter_java
+from tree_sitter import Language, Parser
 
 from app.parsers import node_lines, node_text
+
+JAVA = Language(tree_sitter_java.language())
 
 # Spring repositories are interfaces, configuration is often an enum or record,
 # and all of them are top-level declarations a developer navigates to. Indexing
@@ -25,9 +27,7 @@ HTTP_METHOD_BY_ANNOTATION = {
 
 
 def get_java_parser():
-    parser = Parser()
-    parser.set_language(get_language("java"))
-    return parser
+    return Parser(JAVA)
 
 
 def extract_mapping(annotation_text):

@@ -1,13 +1,13 @@
-from tree_sitter import Parser
-from tree_sitter_languages import get_language
+import tree_sitter_python
+from tree_sitter import Language, Parser
 
 from app.parsers import node_lines, node_text
 
+PYTHON = Language(tree_sitter_python.language())
+
 
 def get_parser():
-    parser = Parser()
-    parser.set_language(get_language("python"))
-    return parser
+    return Parser(PYTHON)
 
 
 def extract_python_functions(code):

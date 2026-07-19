@@ -1,11 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-ai-agent"
+version = "0.2.0"
+description = "Local-first code agent: AST-aware indexing, hybrid retrieval, and grounded answers from a local LLM."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "tree-sitter==0.23.2",
+    "tree-sitter-python==0.23.6",
+    "tree-sitter-java==0.23.5",
+    "qdrant-client==1.17.1",
+    "requests==2.33.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.4.2", "ruff==0.12.10"]
+
+[project.scripts]
+code-agent = "app.cli:main"
+
+[project.urls]
+Repository = "https://github.com/ShubhJ46/local-ai-agent"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
-# The project is not yet installable, so `app` is only importable when the
-# repository root is on sys.path. `python -m pytest` adds it implicitly; a bare
-# `pytest` (how CI invokes it) does not. Replace this with a real [project]
-# table and `pip install -e .` when packaging lands.
-pythonpath = ["."]
 
 [tool.ruff]
 target-version = "py310"
