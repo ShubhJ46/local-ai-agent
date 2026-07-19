@@ -93,6 +93,19 @@ claim can be checked against the code rather than taken on trust:
 `POST /index` indexes a path; `GET /health` reports how many chunks are indexed.
 Interactive docs at `/docs`.
 
+### Docker
+
+```bash
+WORKSPACE=/path/to/your/code docker compose up --build
+curl -X POST localhost:8000/index -H 'Content-Type: application/json' \
+  -d '{"path": "/workspace"}'
+```
+
+The image runs the agent only and reaches Ollama on the host. Running Ollama
+*inside* a container on macOS gives up Metal and falls back to CPU, which is the
+difference between ~13 tok/s and unusable — so it is offered as an opt-in
+`--profile bundled-ollama` for Linux hosts rather than being the default.
+
 ## How it works
 
 ```mermaid
@@ -163,7 +176,7 @@ ruff check .
 pytest --cov
 ```
 
-91 tests, fully offline — a conftest fixture refuses real HTTP, so a
+95 tests, fully offline — a conftest fixture refuses real HTTP, so a
 half-mocked test fails immediately instead of passing on whichever machine
 happens to have Ollama running. CI runs on Python 3.10, 3.11 and 3.12 with
 coverage held at 75%.

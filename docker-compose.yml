@@ -1,0 +1,31 @@
+services:
+  agent:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      # The index persists across restarts; rebuilding it is not free.
+      - agent-index:/data
+      # Mount the code you want to ask about, then POST /index with /workspace.
+      - ${WORKSPACE:-.}:/workspace:ro
+    environment:
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      # Docker Desktop resolves this already; Linux needs it spelled out.
+      - "host.docker.internal:host-gateway"
+
+  # Optional: an Ollama container, for Linux hosts that want one command.
+  # Not enabled by default because on macOS a containerised Ollama loses Metal
+  # and runs on CPU, which is far slower than the host install.
+  #   docker compose --profile bundled-ollama up
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["bundled-ollama"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+
+volumes:
+  agent-index:
+  ollama-models:

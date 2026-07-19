@@ -1,0 +1,12 @@
+venv/
+qdrant_data/
+.eval-corpus/
+.git/
+.github/
+docs/
+tests/
+scripts/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
