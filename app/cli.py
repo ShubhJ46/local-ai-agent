@@ -1,6 +1,6 @@
+from app.agent import run_agent
 from app.errors import LocalAgentError
 from app.ingest.ingest import ingest_codebase
-from app.rag import agent_query
 from app.vector_store import close_client
 
 
@@ -33,7 +33,7 @@ def main():
             continue
 
         try:
-            response = agent_query(query)
+            response = run_agent(query)
             print("\nAgent:", response, "\n")
         except LocalAgentError as error:
             print(f"\nError: {error}\n")

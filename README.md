@@ -7,7 +7,8 @@ A local-first codebase assistant that indexes source code with AST-aware metadat
 - Extracts Python functions and Spring Java types, methods, and endpoint routes with Tree-sitter.
 - Embeds each AST unit whole, with its symbol, route, and line range as metadata.
 - Retrieves with hybrid search: dense vectors fused with BM25, then prioritised by symbol type.
-- Sends retrieved source, paths, symbols, and endpoint details to a local LLM for grounded answers.
+- Answers through a bounded tool-use loop that is grounded on retrieved source before it may reply.
+- Remembers both the current conversation and, in Qdrant, exchanges from earlier sessions.
 - Provides a terminal workflow for indexing a repository and asking questions.
 - Includes offline tests, linting, CI, and a versioned retrieval evaluation harness.
 
@@ -24,7 +25,12 @@ CLI question
                                                      > class > file)
                                                             |
                                                             v
-                                              source-grounded Ollama response
+                                              source-grounded agent loop
+                                              (tools, bounded steps,
+                                               short- + long-term memory)
+                                                            |
+                                                            v
+                                                    cited answer
 ```
 
 ## Retrieval quality
@@ -102,6 +108,23 @@ per retriever and per question category.
 - Embedding is one request per chunk, so first-time indexing of a large repository is slow.
 - Re-indexing replaces the collection, so only one codebase is searchable at a time.
 - The BM25 index is held in memory and rebuilt from the vector store on first query.
+- Answer quality is bounded by the local model, and this is the weakest link. Retrieval reaches 86.7% Recall@5, but `mistral` at temperature 0 still sometimes cites a plausible-sounding path that is not in the retrieved source. Grounding the loop on retrieved source before it may answer removed this on direct questions; it still occurs on follow-ups. Verifying cited file names against the index is the next thing worth building.
+
+### A note on hardware
+
+If the chat and embedding models do not both fit in VRAM, Ollama evicts one to
+load the other. On an 8 GB M1 with `mistral` + `nomic-embed-text`, a warm
+embedding takes 0.1s but the first one *after* a generation takes ~20s, because
+the model is reloaded. Since the agent alternates between the two, this
+dominates latency.
+
+Two things in this repo reduce it: embeddings are memoised per process, and
+long-term recall is computed once per question rather than once per agent step.
+To avoid the swap entirely, run a smaller chat model, or keep both resident:
+
+```bash
+OLLAMA_MAX_LOADED_MODELS=2 ollama serve
+```
 
 ## Roadmap
 

@@ -1,3 +1,11 @@
+"""Two kinds of memory.
+
+Short term is the current conversation, held in process, so a follow-up like
+"explain that in more detail" has an antecedent. Long term is persisted in
+Qdrant and recalled by similarity, so a question asked in an earlier session can
+inform this one.
+"""
+
 import uuid
 
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -9,7 +17,7 @@ MEMORY_COLLECTION = "memory"
 
 
 class ShortTermMemory:
-    def __init__(self, max_messages=5):
+    def __init__(self, max_messages=6):
         self.history = []
         self.max_messages = max_messages
 
@@ -22,12 +30,20 @@ class ShortTermMemory:
     def get_context(self):
         return "\n".join([f"{msg['role']}: {msg['content']}" for msg in self.history])
 
+    def clear(self):
+        self.history.clear()
+
+
+def memory_collection_exists() -> bool:
+    return any(
+        collection.name == MEMORY_COLLECTION
+        for collection in client.get_collections().collections
+    )
+
 
 def init_memory_collection(vector_size):
-    collections = client.get_collections().collections
-    names = [c.name for c in collections]
-
-    if MEMORY_COLLECTION not in names:
+    """Create the long-term collection if it is missing. Safe to call repeatedly."""
+    if not memory_collection_exists():
         client.create_collection(
             collection_name=MEMORY_COLLECTION,
             vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
@@ -36,6 +52,7 @@ def init_memory_collection(vector_size):
 
 def store_memory(text):
     embedding = get_embedding(text)
+    init_memory_collection(len(embedding))
 
     point = PointStruct(id=str(uuid.uuid4()), vector=embedding, payload={"text": text})
 
@@ -43,17 +60,20 @@ def store_memory(text):
 
 
 def retrieve_memory(query, top_k=3):
-    try:
-        query_embedding = get_embedding(query)
+    """Recall prior exchanges similar to the query.
 
-        results = client.query_points(
-            collection_name=MEMORY_COLLECTION,
-            query=query_embedding,
-            limit=top_k,
-            query_filter=...,  # advanced (we can add later)
-        ).points
-
-        return [r.payload["text"] for r in results]
-
-    except Exception:
+    Returns nothing when no memory has been written yet. Failures to embed are
+    left to propagate: if Ollama is unreachable the caller cannot answer either,
+    and silently returning [] here previously hid a real defect for the entire
+    life of this function.
+    """
+    if not memory_collection_exists():
         return []
+
+    results = client.query_points(
+        collection_name=MEMORY_COLLECTION,
+        query=get_embedding(query),
+        limit=top_k,
+    ).points
+
+    return [point.payload["text"] for point in results if point.payload]

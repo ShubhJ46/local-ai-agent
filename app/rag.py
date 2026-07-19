@@ -29,11 +29,13 @@ def agent_query(query: str, top_k: int = 3) -> str:
         return "No indexed documents were found. Run `load <path>` first."
 
     context = format_context(results)
+    conversation = memory.get_context()
+    history = f"\nCONVERSATION SO FAR:\n{conversation}\n" if conversation else ""
     prompt = f"""
 Answer using only the retrieved source. Use at most 120 words.
 State where the behavior is implemented, how it works, and cite file names.
 If a mechanism is missing, say it is not implemented. Do not invent details.
-
+{history}
 RETRIEVED SOURCE:
 {context}
 
