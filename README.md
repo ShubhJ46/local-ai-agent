@@ -71,7 +71,7 @@ source venv/bin/activate
 pip install -r requirements-dev.txt
 ollama serve
 ollama pull nomic-embed-text
-ollama pull mistral
+ollama pull qwen2.5-coder:3b
 python3 -m app.cli
 ```
 
@@ -108,23 +108,31 @@ per retriever and per question category.
 - Embedding is one request per chunk, so first-time indexing of a large repository is slow.
 - Re-indexing replaces the collection, so only one codebase is searchable at a time.
 - The BM25 index is held in memory and rebuilt from the vector store on first query.
-- Answer quality is bounded by the local model, and this is the weakest link. Retrieval reaches 86.7% Recall@5, but `mistral` at temperature 0 still sometimes cites a plausible-sounding path that is not in the retrieved source. Grounding the loop on retrieved source before it may answer removed this on direct questions; it still occurs on follow-ups. Verifying cited file names against the index is the next thing worth building.
+- Answer quality is bounded by the local model. Cited file names are not yet verified against the index, so a sufficiently weak model can still invent one; see "Choosing a model" below for what this looked like with a 7B that did not fit in GPU memory.
 
-### A note on hardware
+### Choosing a model
 
-If the chat and embedding models do not both fit in VRAM, Ollama evicts one to
-load the other. On an 8 GB M1 with `mistral` + `nomic-embed-text`, a warm
-embedding takes 0.1s but the first one *after* a generation takes ~20s, because
-the model is reloaded. Since the agent alternates between the two, this
-dominates latency.
+Pick a model that fits **entirely** in your GPU budget, including its KV cache.
+Partial offload is not a graceful degradation — on unified memory it is a cliff.
 
-Two things in this repo reduce it: embeddings are memoised per process, and
-long-term recall is computed once per question rather than once per agent step.
-To avoid the swap entirely, run a smaller chat model, or keep both resident:
+Measured on an 8 GB M1 (~5.3 GiB usable), same prompt, same 120 generated tokens:
 
-```bash
-OLLAMA_MAX_LOADED_MODELS=2 ollama serve
-```
+| Model | Resident size | Placement | Generation | Wall clock |
+| --- | --- | --- | --- | --- |
+| `mistral` (7B) | 5.1 GB | 10% CPU / 90% GPU | 0.9 tok/s | 143.7s |
+| `qwen2.5-coder:3b` | 2.2 GB | **100% GPU** | **12.7 tok/s** | **13.9s** |
+
+The 7B exceeds the budget by a few hundred megabytes once its 4096-token cache
+is allocated, and the 10% that spills to CPU costs roughly 14x in throughput.
+The 3B is both faster and better at this task, being code-specialised — answers
+went from citing invented paths to quoting real source with line numbers.
+
+Check placement with `ollama ps`; anything other than `100% GPU` is the first
+thing to fix. On a larger GPU, `qwen2.5-coder:7b` is a reasonable upgrade.
+
+Embeddings are additionally memoised per process, and long-term recall is
+computed once per question rather than once per agent step, since the same text
+would otherwise be embedded several times per question.
 
 ## Roadmap
 
