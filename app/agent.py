@@ -12,6 +12,7 @@ crashes on malformed output is worse than one that answers in a single pass.
 
 import re
 
+from app.citations import cited_files, verify
 from app.llm import query_llm
 from app.memory import ShortTermMemory, retrieve_memory, store_memory
 from app.rag import agent_query, format_context
@@ -82,6 +83,10 @@ def run_agent(
         return "No indexed documents were found. Run `load <path>` first."
     context = format_context(results)
 
+    # Everything the model has legitimately been shown. Tool observations add to
+    # it, so a file found mid-loop is not later flagged as invented.
+    seen_files = {result.get("file") for result in results if result.get("file")}
+
     for _step in range(max_steps):
         prompt = PROMPT.format(
             tools="\n".join(TOOL_DESCRIPTIONS.values()),
@@ -98,7 +103,8 @@ def run_agent(
         # A model that emits both is answering while narrating; prefer the answer
         # unless the tool call came first.
         if final and (not call or final.start() < call.start()):
-            return _finish(question, final.group(1).strip(), short_term, remember)
+            answer = verify(final.group(1).strip(), seen_files)
+            return _finish(question, answer, short_term, remember)
 
         if call:
             name, argument = call.group(1).strip(), call.group(2).strip()
@@ -110,6 +116,7 @@ def run_agent(
                 observation = str(tool(argument))
             except Exception as error:  # a failing tool must not end the session
                 observation = f"tool raised {type(error).__name__}: {error}"
+            seen_files |= cited_files(observation)
             transcript.append(f"TOOL {name}({argument}) ->\n{observation[:1200]}")
             continue
 
@@ -117,7 +124,8 @@ def run_agent(
         # prompt, so fall back to answering directly from retrieval.
         break
 
-    return _finish(question, _direct_answer(question, transcript, context), short_term, remember)
+    answer = verify(_direct_answer(question, transcript, context), seen_files)
+    return _finish(question, answer, short_term, remember)
 
 
 def _direct_answer(question: str, transcript: list[str], context: str = "") -> str:

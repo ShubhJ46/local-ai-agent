@@ -61,17 +61,18 @@ def test_agent_reports_an_empty_index_without_calling_the_model():
 
 
 def test_agent_answers_without_tools_when_it_can(memory):
-    with patch("app.agent.query_llm", return_value="FINAL_ANSWER: Login lives in auth.py.") as llm:
+    reply = "FINAL_ANSWER: Login lives in AuthController.java."
+    with patch("app.agent.query_llm", return_value=reply) as llm:
         answer = run_agent("Where is login?", memory=memory)
 
-    assert answer == "Login lives in auth.py."
+    assert answer == "Login lives in AuthController.java."
     assert llm.call_count == 1
 
 
 def test_agent_executes_a_tool_then_answers(memory):
     replies = [
         "TOOL: search_documents | login handler",
-        "FINAL_ANSWER: Login is handled in auth.py.",
+        "FINAL_ANSWER: Login is handled in AuthController.java.",
     ]
     with (
         patch("app.agent.query_llm", side_effect=replies),
@@ -79,7 +80,7 @@ def test_agent_executes_a_tool_then_answers(memory):
     ):
         answer = run_agent("Where is login?", memory=memory)
 
-    assert answer == "Login is handled in auth.py."
+    assert answer == "Login is handled in AuthController.java."
 
 
 def test_agent_feeds_tool_output_back_into_the_next_prompt(memory):
@@ -137,6 +138,32 @@ def test_agent_falls_back_when_the_reply_ignores_the_protocol(memory):
         assert run_agent("Where is login?", memory=memory) == "Fell back."
 
     assert fallback.call_count == 1
+
+
+def test_agent_flags_a_citation_it_never_retrieved(memory):
+    """End-to-end guard on the failure mistral actually produced."""
+    reply = "FINAL_ANSWER: The endpoint is in the api/pets/owners.java file."
+    with patch("app.agent.query_llm", return_value=reply):
+        answer = run_agent("Which endpoint creates an owner?", memory=memory)
+
+    assert "unverified" in answer
+    assert "AuthController.java" in answer
+
+
+def test_agent_accepts_a_file_discovered_through_a_tool(memory):
+    """A file seen only in a tool observation is legitimately citable."""
+    replies = [
+        "TOOL: read_file | VetRepository.java",
+        "FINAL_ANSWER: Caching is configured in VetRepository.java.",
+    ]
+    with (
+        patch("app.agent.query_llm", side_effect=replies),
+        patch.dict("app.agent.TOOLS", {"read_file": lambda name: "VetRepository.java: @Cacheable"}),
+    ):
+        answer = run_agent("Where is caching?", memory=memory)
+
+    assert answer == "Caching is configured in VetRepository.java."
+    assert "unverified" not in answer
 
 
 def test_agent_records_the_exchange_in_short_term_memory(memory):
