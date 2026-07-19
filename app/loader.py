@@ -48,6 +48,8 @@ def load_documents(folder_path: str) -> list[dict]:
                             "name": entity["name"],
                             "class": entity["name"],
                             "annotations": entity.get("annotations", []),
+                            "start_line": entity.get("start_line"),
+                            "end_line": entity.get("end_line"),
                         },
                     }
                 )
@@ -74,6 +76,8 @@ def load_documents(folder_path: str) -> list[dict]:
                             "endpoint": full_path,
                             "http_method": ent.get("http_method"),
                             "annotations": ent.get("annotations", []),
+                            "start_line": ent.get("start_line"),
+                            "end_line": ent.get("end_line"),
                         },
                     }
                 )
@@ -87,6 +91,8 @@ def load_documents(folder_path: str) -> list[dict]:
                             "path": path_string,
                             "type": "function",
                             "name": func["name"],
+                            "start_line": func.get("start_line"),
+                            "end_line": func.get("end_line"),
                         },
                     }
                 )

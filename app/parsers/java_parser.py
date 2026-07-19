@@ -1,5 +1,17 @@
+import re
+
 from tree_sitter import Parser
 from tree_sitter_languages import get_language
+
+from app.parsers import node_lines, node_text
+
+HTTP_METHOD_BY_ANNOTATION = {
+    "GetMapping": "GET",
+    "PostMapping": "POST",
+    "PutMapping": "PUT",
+    "DeleteMapping": "DELETE",
+    "PatchMapping": "PATCH",
+}
 
 
 def get_java_parser():
@@ -8,70 +20,62 @@ def get_java_parser():
     return parser
 
 
-def extract_java_entities(code):
-    parser = get_java_parser()
-    tree = parser.parse(bytes(code, "utf8"))
-
-    root = tree.root_node
-    results = []
-
-    def traverse(node):
-        # Class
-        if node.type == "class_declaration":
-            name_node = node.child_by_field_name("name")
-            name = code[name_node.start_byte : name_node.end_byte]
-
-            results.append(
-                {"type": "class", "name": name, "text": code[node.start_byte : node.end_byte]}
-            )
-
-            return
-
-        # Method
-        if node.type == "method_declaration":
-            name_node = node.child_by_field_name("name")
-            name = code[name_node.start_byte : name_node.end_byte]
-
-            results.append(
-                {"type": "method", "name": name, "text": code[node.start_byte : node.end_byte]}
-            )
-
-        for child in node.children:
-            traverse(child)
-
-    traverse(root)
-    return results
-
-
 def extract_mapping(annotation_text):
-    import re
+    """Return the (path, http_method) a Spring mapping annotation declares.
 
-    # Examples:
-    # @PostMapping("/login")
-    # @RequestMapping(value="/auth", method=RequestMethod.POST)
-
+    Handles both the shorthand forms (``@GetMapping("/login")``) and the generic
+    ``@RequestMapping(value="/auth", method=RequestMethod.POST)``.
+    """
     path_match = re.search(r"\"(.*?)\"", annotation_text)
     path = path_match.group(1) if path_match else ""
 
-    if "GetMapping" in annotation_text:
-        method = "GET"
-    elif "PostMapping" in annotation_text:
-        method = "POST"
-    elif "PutMapping" in annotation_text:
-        method = "PUT"
-    elif "DeleteMapping" in annotation_text:
-        method = "DELETE"
-    else:
-        method = "UNKNOWN"
+    for annotation, http_method in HTTP_METHOD_BY_ANNOTATION.items():
+        if annotation in annotation_text:
+            return path, http_method
 
-    return path, method
+    request_method = re.search(r"RequestMethod\.(\w+)", annotation_text)
+    if request_method:
+        return path, request_method.group(1).upper()
+
+    return path, "UNKNOWN"
+
+
+def extract_java_entities(code):
+    """Extract class and method declarations without Spring-specific metadata."""
+    parser = get_java_parser()
+    source = code.encode("utf-8")
+    tree = parser.parse(source)
+    results = []
+
+    def traverse(node):
+        if node.type in ("class_declaration", "method_declaration"):
+            name_node = node.child_by_field_name("name")
+            if name_node is None:
+                return
+            start_line, end_line = node_lines(node)
+            results.append(
+                {
+                    "type": "class" if node.type == "class_declaration" else "method",
+                    "name": node_text(source, name_node),
+                    "text": node_text(source, node),
+                    "start_line": start_line,
+                    "end_line": end_line,
+                }
+            )
+            if node.type == "class_declaration":
+                return
+        for child in node.children:
+            traverse(child)
+
+    traverse(tree.root_node)
+    return results
 
 
 def extract_spring_entities(code):
+    """Extract classes and methods along with their Spring routing metadata."""
     parser = get_java_parser()
-    tree = parser.parse(bytes(code, "utf8"))
-
-    root = tree.root_node
+    source = code.encode("utf-8")
+    tree = parser.parse(source)
     results = []
 
     def get_annotations(node):
@@ -79,8 +83,8 @@ def extract_spring_entities(code):
         for child in node.children:
             if child.type == "modifiers":
                 for sub in child.children:
-                    if sub.type == "annotation":
-                        annotations.append(code[sub.start_byte : sub.end_byte])
+                    if sub.type in ("annotation", "marker_annotation"):
+                        annotations.append(node_text(source, sub))
         return annotations
 
     def traverse(node):
@@ -89,22 +93,22 @@ def extract_spring_entities(code):
             if not name_node:
                 return
 
-            name = code[name_node.start_byte : name_node.end_byte]
-
-            annotations = get_annotations(node)  # ✅ defined once
+            annotations = get_annotations(node)
             base_path = ""
+            for annotation in annotations:
+                if "RequestMapping" in annotation:
+                    base_path, _ = extract_mapping(annotation)
 
-            for ann in annotations:
-                if "RequestMapping" in ann:
-                    base_path, _ = extract_mapping(ann)
-
+            start_line, end_line = node_lines(node)
             results.append(
                 {
                     "type": "class",
-                    "name": name,
+                    "name": node_text(source, name_node),
                     "base_path": base_path,
                     "annotations": annotations,
-                    "text": code[node.start_byte : node.end_byte],
+                    "text": node_text(source, node),
+                    "start_line": start_line,
+                    "end_line": end_line,
                 }
             )
 
@@ -113,30 +117,29 @@ def extract_spring_entities(code):
             if not name_node:
                 return
 
-            name = code[name_node.start_byte : name_node.end_byte]
-
-            annotations = get_annotations(node)  # ✅ always defined
-
+            annotations = get_annotations(node)
             endpoint = None
             http_method = None
+            for annotation in annotations:
+                if "Mapping" in annotation:
+                    endpoint, http_method = extract_mapping(annotation)
 
-            for ann in annotations:
-                if "Mapping" in ann:
-                    endpoint, http_method = extract_mapping(ann)
-
+            start_line, end_line = node_lines(node)
             results.append(
                 {
                     "type": "method",
-                    "name": name,
+                    "name": node_text(source, name_node),
                     "annotations": annotations,
                     "endpoint": endpoint,
                     "http_method": http_method,
-                    "text": code[node.start_byte : node.end_byte],
+                    "text": node_text(source, node),
+                    "start_line": start_line,
+                    "end_line": end_line,
                 }
             )
 
         for child in node.children:
             traverse(child)
 
-    traverse(root)
+    traverse(tree.root_node)
     return results

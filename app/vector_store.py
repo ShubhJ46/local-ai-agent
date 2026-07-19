@@ -73,6 +73,9 @@ def search(
                 continue
 
         item = {
+            # Stable within an index. Used as the join key when fusing rankings
+            # from separate retrievers.
+            "id": hit.id,
             "text": payload.get("text"),
             "file": metadata.get("file_name"),
             "type": metadata.get("type"),
@@ -81,6 +84,8 @@ def search(
             "annotations": metadata.get("annotations", []),
             "endpoint": metadata.get("endpoint"),
             "http_method": metadata.get("http_method"),
+            "start_line": metadata.get("start_line"),
+            "end_line": metadata.get("end_line"),
         }
 
         formatted.append(item)
