@@ -16,7 +16,12 @@ def load_documents(folder_path: str) -> list[dict]:
     documents = []
 
     for path in sorted(root_path.rglob("*")):
-        ignored = any(part in IGNORED_FOLDERS or part.startswith(".") for part in path.parts)
+        # Only inspect the path *below* the indexed root. Checking the absolute
+        # path would skip every file whenever an ancestor happens to be hidden
+        # (e.g. indexing a checkout under ~/.local/src), yielding a silently
+        # empty index.
+        relative_parts = path.relative_to(root_path).parts
+        ignored = any(part in IGNORED_FOLDERS or part.startswith(".") for part in relative_parts)
         if not path.is_file() or ignored:
             continue
         if path.suffix.lower() not in SUPPORTED_EXTENSIONS:

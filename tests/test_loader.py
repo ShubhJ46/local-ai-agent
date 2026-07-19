@@ -14,6 +14,24 @@ def test_loader_extracts_python_functions_and_skips_hidden_directories(tmp_path)
     assert documents[0]["metadata"]["path"] == str(tmp_path / "module.py")
 
 
+def test_loader_indexes_a_root_that_is_itself_hidden(tmp_path):
+    """A hidden ancestor must not suppress the whole index.
+
+    The hidden-directory rule applies below the indexed root, so a checkout
+    living under a dotted directory still indexes normally.
+    """
+    hidden_root = tmp_path / ".eval-corpus" / "project"
+    hidden_root.mkdir(parents=True)
+    (hidden_root / "module.py").write_text("def useful():\n    return 42\n")
+    nested_hidden = hidden_root / ".git"
+    nested_hidden.mkdir()
+    (nested_hidden / "ignored.py").write_text("def ignored(): pass\n")
+
+    documents = load_documents(str(hidden_root))
+
+    assert [document["metadata"]["name"] for document in documents] == ["useful"]
+
+
 def test_loader_rejects_missing_directory(tmp_path):
     try:
         load_documents(str(tmp_path / "missing"))

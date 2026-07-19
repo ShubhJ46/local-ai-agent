@@ -8,3 +8,6 @@ build/
 qdrant_data/
 .pytest_cache/
 .ruff_cache/
+
+# Evaluation corpora are fetched on demand, never vendored.
+.eval-corpus/
