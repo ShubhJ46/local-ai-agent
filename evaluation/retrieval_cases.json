@@ -1,14 +1,194 @@
 [
   {
-    "question": "Where is authentication handled?",
-    "expected_name": "authenticate_user"
+    "id": "ep-owner-create-form",
+    "category": "endpoint",
+    "question": "Where is the form for adding a new owner rendered?",
+    "expected_file": "OwnerController.java",
+    "expected_name": "initCreationForm"
   },
   {
-    "question": "Where is the helper function defined?",
-    "expected_name": "helper"
+    "id": "ep-owner-create-submit",
+    "category": "endpoint",
+    "question": "Which handler saves a newly submitted owner?",
+    "expected_file": "OwnerController.java",
+    "expected_name": "processCreationForm"
   },
   {
-    "question": "Where is the main function defined?",
-    "expected_file": "main.cpp"
+    "id": "ep-owner-search",
+    "category": "endpoint",
+    "question": "How are owners searched by last name?",
+    "expected_file": "OwnerController.java",
+    "expected_name": "processFindForm"
+  },
+  {
+    "id": "ep-owner-details",
+    "category": "endpoint",
+    "question": "Which endpoint shows the details of a single owner?",
+    "expected_file": "OwnerController.java",
+    "expected_name": "showOwner"
+  },
+  {
+    "id": "ep-owner-update",
+    "category": "endpoint",
+    "question": "Where is an existing owner's information updated and saved?",
+    "expected_file": "OwnerController.java",
+    "expected_name": "processUpdateOwnerForm"
+  },
+  {
+    "id": "ep-pet-add",
+    "category": "endpoint",
+    "question": "How do I add a new pet to an existing owner?",
+    "expected_file": "PetController.java"
+  },
+  {
+    "id": "ep-pet-edit",
+    "category": "endpoint",
+    "question": "Where are the details of an existing pet edited?",
+    "expected_file": "PetController.java",
+    "expected_name": "processUpdateForm"
+  },
+  {
+    "id": "ep-visit-book",
+    "category": "endpoint",
+    "question": "How is a new visit scheduled for a pet?",
+    "expected_file": "VisitController.java",
+    "expected_name": "processNewVisitForm"
+  },
+  {
+    "id": "ep-visit-form",
+    "category": "endpoint",
+    "question": "Which handler renders the visit booking form?",
+    "expected_file": "VisitController.java",
+    "expected_name": "initNewVisitForm"
+  },
+  {
+    "id": "ep-vet-list",
+    "category": "endpoint",
+    "question": "Where is the paginated list of veterinarians displayed as HTML?",
+    "expected_file": "VetController.java",
+    "expected_name": "showVetList"
+  },
+  {
+    "id": "ep-vet-json",
+    "category": "endpoint",
+    "question": "Is there a JSON API that returns the veterinarians?",
+    "expected_file": "VetController.java",
+    "expected_name": "showResourcesVetList"
+  },
+  {
+    "id": "ep-welcome",
+    "category": "endpoint",
+    "question": "What does the application serve at the root URL?",
+    "expected_file": "WelcomeController.java",
+    "expected_name": "welcome"
+  },
+  {
+    "id": "ep-crash",
+    "category": "endpoint",
+    "question": "Where is the endpoint that deliberately throws an exception to test error handling?",
+    "expected_file": "CrashController.java",
+    "expected_name": "triggerException"
+  },
+  {
+    "id": "cls-pet-validator",
+    "category": "class",
+    "question": "Where is pet input validated before it is saved?",
+    "expected_file": "PetValidator.java"
+  },
+  {
+    "id": "cls-pet-type-formatter",
+    "category": "class",
+    "question": "How are pet type names converted between strings and objects in forms?",
+    "expected_file": "PetTypeFormatter.java"
+  },
+  {
+    "id": "cls-cache-config",
+    "category": "class",
+    "question": "Which class configures caching for the application?",
+    "expected_file": "CacheConfiguration.java"
+  },
+  {
+    "id": "cls-web-config",
+    "category": "class",
+    "question": "Where is language and locale switching configured?",
+    "expected_file": "WebConfiguration.java"
+  },
+  {
+    "id": "cls-base-entity",
+    "category": "class",
+    "question": "What is the base class that gives entities their database identifier?",
+    "expected_file": "BaseEntity.java"
+  },
+  {
+    "id": "cls-person",
+    "category": "class",
+    "question": "Where are the first name and last name fields defined?",
+    "expected_file": "Person.java"
+  },
+  {
+    "id": "cls-application",
+    "category": "class",
+    "question": "What is the main entry point that starts the application?",
+    "expected_file": "PetClinicApplication.java"
+  },
+  {
+    "id": "cls-specialty",
+    "category": "class",
+    "question": "Where is a veterinarian's area of specialty modelled?",
+    "expected_file": "Specialty.java"
+  },
+  {
+    "id": "cls-named-entity",
+    "category": "class",
+    "question": "Which class adds a name field shared by several entities?",
+    "expected_file": "NamedEntity.java"
+  },
+  {
+    "id": "data-owner-repo",
+    "category": "data",
+    "question": "How are owners looked up and persisted in the database?",
+    "expected_file": "OwnerRepository.java"
+  },
+  {
+    "id": "data-vet-repo-cache",
+    "category": "data",
+    "question": "Which database queries have their results cached?",
+    "expected_file": "VetRepository.java"
+  },
+  {
+    "id": "data-pet-type-repo",
+    "category": "data",
+    "question": "How is the list of available pet types fetched from storage?",
+    "expected_file": "PetTypeRepository.java"
+  },
+  {
+    "id": "data-vets-wrapper",
+    "category": "data",
+    "question": "Where are veterinarians wrapped into an object for XML serialization?",
+    "expected_file": "Vets.java"
+  },
+  {
+    "id": "model-owner-pets",
+    "category": "model",
+    "question": "How does an owner keep track of the pets belonging to them?",
+    "expected_file": "Owner.java"
+  },
+  {
+    "id": "model-visit",
+    "category": "model",
+    "question": "What information is recorded for a clinic visit?",
+    "expected_file": "Visit.java"
+  },
+  {
+    "id": "model-pet",
+    "category": "model",
+    "question": "Where is a pet's birth date stored?",
+    "expected_file": "Pet.java"
+  },
+  {
+    "id": "model-runtime-hints",
+    "category": "model",
+    "question": "How does the project support compiling to a GraalVM native image?",
+    "expected_file": "PetClinicRuntimeHints.java"
   }
 ]
