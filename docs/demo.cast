@@ -1,0 +1,12 @@
+{"version":3,"term":{"cols":80,"rows":24},"timestamp":1784480771,"command":"python scripts/record_demo.py","env":{"SHELL":"/bin/zsh"}}
+[1.310, "o", "🧠 Local AI Code Agent\r\r\nCommands:\r\r\n  load <path>  → index codebase\r\r\n  exit         → quit\r\r\n\r\r\nYou: "]
+[2.918, "o", "load .eval-corpus/spring-petclinic/src/main\r\r\n"]
+[4.837, "o", "\r  embedding 64/118 chunks..."]
+[3.267, "o", "\r  embedding 118/118 chunks..."]
+[0.173, "o", "\r                                        \r\r\r\n✅ Indexed 118 chunks from 28 changed file(s); 28 file(s) known.\r\r\n\r\r\nYou: "]
+[2.752, "o", "Which endpoint creates a new pet owner?\r\r\n"]
+[3.361, "o", "\r\r\nAgent:\r\r\n  The endpoint that creates a new pet owner is `/owners/new`. This can be found\r\r\n  in the `OwnerController.java` file at line 72-75. \r\r\n\r\r\nYou: "]
+[2.322, "o", "What HTTP method does it use?\r\r\n"]
+[5.441, "o", "\r\r\nAgent:\r\r\n  GET \r\r\n\r\r\nYou: "]
+[1.236, "o", "exit\r\r\n"]
+[0.147, "x", "0"]

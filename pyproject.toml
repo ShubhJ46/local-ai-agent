@@ -18,7 +18,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==8.4.2", "pytest-cov==7.0.0", "ruff==0.12.10"]
+# The HTTP interface is optional: the CLI needs none of it, so a plain install
+# stays small.
+api = ["fastapi==0.139.2", "uvicorn==0.51.0"]
+dev = [
+    "local-ai-agent[api]",
+    "httpx==0.28.1",  # required by fastapi's TestClient
+    "pytest==8.4.2",
+    "pytest-cov==7.0.0",
+    "ruff==0.12.10",
+]
 
 [project.scripts]
 code-agent = "app.cli:main"
