@@ -1,0 +1,14 @@
+[
+  {
+    "question": "Where is authentication handled?",
+    "expected_name": "authenticate_user"
+  },
+  {
+    "question": "Where is the helper function defined?",
+    "expected_name": "helper"
+  },
+  {
+    "question": "Where is the main function defined?",
+    "expected_file": "main.cpp"
+  }
+]
