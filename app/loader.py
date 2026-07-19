@@ -1,90 +1,96 @@
-import os
+from pathlib import Path
+
 from app.parsers.code_parser import extract_python_functions
 from app.parsers.java_parser import extract_spring_entities
 
+SUPPORTED_EXTENSIONS = [".py", ".cpp", ".c", ".h", ".js", ".ts", ".java", ".md", ".txt"]
 
-SUPPORTED_EXTENSIONS = [
-    ".py", ".cpp", ".c", ".h",
-    ".js", ".ts", ".java",
-    ".md", ".txt"
-]
-
-IGNORED_FOLDERS = ["venv", ".git", "__pycache__"]
+IGNORED_FOLDERS = {"venv", ".git", "__pycache__", "node_modules", ".pytest_cache", "qdrant_data"}
 
 
-def load_documents(folder_path):
+def load_documents(folder_path: str) -> list[dict]:
+    root_path = Path(folder_path).expanduser().resolve()
+    if not root_path.is_dir():
+        raise ValueError(f"Index path is not a directory: {root_path}")
+
     documents = []
 
-    for root, dirs, files in os.walk(folder_path):
-        dirs[:] = [ d for d in dirs if d not in IGNORED_FOLDERS and not d.startswith(".")]
-        for file in files:
-            if any(file.endswith(ext) for ext in SUPPORTED_EXTENSIONS):
-                path = os.path.join(root, file)
-                
-                with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                    content = f.read()
+    for path in sorted(root_path.rglob("*")):
+        ignored = any(part in IGNORED_FOLDERS or part.startswith(".") for part in path.parts)
+        if not path.is_file() or ignored:
+            continue
+        if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            continue
 
-                
-                if file.endswith(".java"):
-                    entities = extract_spring_entities(content)
+        content = path.read_text(encoding="utf-8", errors="ignore")
+        file = path.name
+        path_string = str(path)
 
-                    current_class = None
-                    base_path = ""
+        if path.suffix == ".java":
+            entities = extract_spring_entities(content)
+            class_entity = next((ent for ent in entities if ent["type"] == "class"), None)
+            current_class = class_entity["name"] if class_entity else None
+            base_path = class_entity.get("base_path", "") if class_entity else ""
 
-                    for ent in entities:
-                        if ent["type"] == "class":
-                            current_class = ent["name"]
-                            base_path = ent.get("base_path", "")
-
-                        elif ent["type"] == "method":
-                            full_path = (base_path or "") + (ent.get("endpoint") or "")
-
-                            documents.append({
-                                "content": f"""
-                                HTTP METHOD: {ent.get("http_method")}
-                                ENDPOINT: {full_path}
-                                FUNCTION: {ent.get("name")}
-                                CLASS: {current_class}
-
-                                ANNOTATIONS: {' '.join(ent.get("annotations", []))}
-
-                                CODE:
-                                {ent['text']}
-                                """,
-                                "metadata": {
-                                    "file_name": file,
-                                    "path": path,
-                                    "type": "endpoint",
-                                    "name": ent["name"],
-                                    "class": current_class,
-                                    "endpoint": full_path,
-                                    "http_method": ent.get("http_method"),
-                                    "annotations": ent.get("annotations", [])
-                                }
-                            })
-
-                elif file.endswith(".py"):
-                    functions = extract_python_functions(content)
-
-                    for func in functions:
-                        documents.append({
-                            "content": func["text"],
-                            "metadata": {
-                                "file_name": file,
-                                "path": path,
-                                "type": "function",
-                                "name": func["name"]
-                            }
-                        })
-
-                else:
-                    documents.append({
-                        "content": content,
+            for entity in (ent for ent in entities if ent["type"] == "class"):
+                documents.append(
+                    {
+                        "content": entity["text"],
                         "metadata": {
                             "file_name": file,
-                            "path": path,
-                            "type": "file"
-                        }
-                    })
+                            "path": path_string,
+                            "type": "class",
+                            "name": entity["name"],
+                            "class": entity["name"],
+                            "annotations": entity.get("annotations", []),
+                        },
+                    }
+                )
+
+            for ent in entities:
+                if ent["type"] != "method":
+                    continue
+                full_path = (base_path or "") + (ent.get("endpoint") or "")
+                document_type = "endpoint" if ent.get("endpoint") else "method"
+                documents.append(
+                    {
+                        "content": (
+                            f"HTTP METHOD: {ent.get('http_method')}\nENDPOINT: {full_path}\n"
+                            f"FUNCTION: {ent.get('name')}\nCLASS: {current_class}\n"
+                            f"ANNOTATIONS: {' '.join(ent.get('annotations', []))}\n\n"
+                            f"CODE:\n{ent['text']}"
+                        ),
+                        "metadata": {
+                            "file_name": file,
+                            "path": path_string,
+                            "type": document_type,
+                            "name": ent["name"],
+                            "class": current_class,
+                            "endpoint": full_path,
+                            "http_method": ent.get("http_method"),
+                            "annotations": ent.get("annotations", []),
+                        },
+                    }
+                )
+        elif path.suffix == ".py":
+            for func in extract_python_functions(content):
+                documents.append(
+                    {
+                        "content": func["text"],
+                        "metadata": {
+                            "file_name": file,
+                            "path": path_string,
+                            "type": "function",
+                            "name": func["name"],
+                        },
+                    }
+                )
+        else:
+            documents.append(
+                {
+                    "content": content,
+                    "metadata": {"file_name": file, "path": path_string, "type": "file"},
+                }
+            )
 
     return documents
