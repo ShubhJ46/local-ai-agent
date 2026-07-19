@@ -15,19 +15,23 @@ and a follow-up that depends on the previous turn.*
 ## Does it work?
 
 Measured against [spring-petclinic](https://github.com/spring-projects/spring-petclinic)
-(pinned revision, 118 chunks) with the 30 questions in
+(pinned revision, 118 chunks) with the 80 questions in
 `evaluation/retrieval_cases.json`, at k=5:
 
 | Configuration | Recall@5 | MRR |
 | --- | --- | --- |
-| Vector only | 76.7% | 0.594 |
-| BM25 only | 50.0% | 0.354 |
-| **Hybrid (shipped)** | **86.7%** | **0.662** |
+| Vector only | 63.7% | 0.434 |
+| BM25 only | 38.8% | 0.247 |
+| **Hybrid (shipped)** | **67.5%** | **0.453** |
 
-Endpoint-navigation questions reach **100% Recall@5**. The starting point —
-character-window chunking with keyword reranking — scored 70.0% / 0.503, so
-hybrid retrieval over whole AST units is worth **+16.7 points of recall and
-+32% MRR**.
+| Category | n | Vector | Hybrid |
+| --- | --- | --- | --- |
+| endpoint | 16 | 93.8% | 87.5% |
+| config | 6 | 83.3% | 83.3% |
+| data | 9 | 44.4% | **77.8%** |
+| model | 18 | 61.1% | 66.7% |
+| class | 15 | 53.3% | 60.0% |
+| method | 14 | 42.9% | 35.7% |
 
 Reproduce it:
 
@@ -36,9 +40,28 @@ Reproduce it:
 python3 -m scripts.evaluate_retrieval .eval-corpus/spring-petclinic/src/main
 ```
 
-A sweep over fusion parameters found no setting that reliably beat the
-defaults, so the shipped constants are the standard ones rather than values
-fitted to this question set.
+### What the numbers cost to get right
+
+This suite began as 30 questions, on which the same system scored **86.7%**.
+That number was wrong — not miscalculated, but measured on a set too small and
+too easy to be informative. One case was worth 3.3 points, so no change smaller
+than roughly ten points could be distinguished from noise.
+
+Expanding to 80 harder questions dropped the score to 60.0% and revealed
+something the small set had hidden: **fusing the two retrievers as equals was
+performing worse than dense search alone** (60.0% against 63.7%). BM25 is
+markedly weaker on this corpus, and giving it an equal vote was actively
+harmful.
+
+Two changes followed, and their parameters were chosen on a random half of the
+questions and then validated on the half held back: weighting dense search
+twice as heavily as BM25, and capping how many results any single file may
+contribute. On the 35 unseen questions that was worth **+8.6 points of recall**.
+
+The trade-off is visible in the table above and is not hidden: capping per file
+costs a little on endpoint and method questions, where the answer is genuinely
+the fourth unit inside one large controller, and buys a great deal on data,
+class, and model questions that a single crowded file used to bury.
 
 ## Quick start
 
@@ -122,13 +145,14 @@ flowchart TD
         Q --> L[BM25 lexical search]
         E -.-> V
         E -.-> L
-        V --> F[Reciprocal rank fusion]
-        L --> F
+        V -->|weight 2| F[Weighted reciprocal rank fusion]
+        L -->|weight 1| F
         F --> P["Type priority<br/>endpoint &gt; method &gt; class &gt; file"]
+        P --> DV["Per-file cap<br/>at most 3 from one file"]
     end
 
     subgraph Answering
-        P --> G[Agent loop, grounded before it may answer]
+        DV --> G[Agent loop, grounded before it may answer]
         M["Memory<br/>session + persisted"] --> G
         G -->|tool call| T["search_documents<br/>find_endpoint · read_file"]
         T --> G
@@ -144,11 +168,12 @@ retrieval unit; slicing it into 1200-character windows discards the structure
 the parser just recovered. Units are embedded whole and split only when they
 exceed the embedding budget, at line boundaries.
 
-**Fuse two retrievers rather than trusting one.** Embeddings handle paraphrase
-but drift on exact identifiers; BM25 nails `OwnerRepository` but cannot bridge
-vocabulary. Their rankings are combined with reciprocal rank fusion, which
-works on ranks and so sidesteps the fact that cosine similarity and BM25 scores
-are not comparable.
+**Fuse two retrievers, but not as equals.** Embeddings handle paraphrase and
+drift on exact identifiers; BM25 does the reverse. Their rankings are combined
+with reciprocal rank fusion, which works on ranks and so sidesteps the fact that
+cosine similarity and BM25 scores are not comparable. Dense search is weighted
+twice as heavily, because it measurably earns it on this corpus — weighting them
+equally made the combination worse than dense search alone.
 
 **Ground before answering, then verify.** The agent retrieves before its first
 model call — left to decide for itself it answers from parametric knowledge and
@@ -176,7 +201,7 @@ ruff check .
 pytest --cov
 ```
 
-95 tests, fully offline — a conftest fixture refuses real HTTP, so a
+100 tests, fully offline — a conftest fixture refuses real HTTP, so a
 half-mocked test fails immediately instead of passing on whichever machine
 happens to have Ollama running. CI runs on Python 3.10, 3.11 and 3.12 with
 coverage held at 75%.

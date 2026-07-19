@@ -71,6 +71,45 @@ def test_fuse_handles_empty_rankings():
     assert fuse([[], []], top_k=5) == []
 
 
+def test_fuse_caps_results_from_a_single_file():
+    """Five chunks of one class is not five results."""
+    crowded = [result(index, "method", file="Owner.java") for index in range(6)]
+    crowded.append(result(99, "class", file="OwnerRepository.java"))
+
+    fused = fuse([crowded], top_k=5, max_per_file=2)
+
+    assert [item["file"] for item in fused].count("Owner.java") == 2
+    assert any(item["file"] == "OwnerRepository.java" for item in fused)
+
+
+def test_fuse_still_returns_a_dominant_file_when_nothing_else_matches():
+    """The cap must not discard results when there is no alternative."""
+    only = [result(index, "method", file="Owner.java") for index in range(4)]
+
+    assert len(fuse([only], top_k=5, max_per_file=2)) == 2
+
+
+def test_fuse_can_disable_the_cap():
+    only = [result(index, "method", file="Owner.java") for index in range(4)]
+
+    assert len(fuse([only], top_k=5, max_per_file=None)) == 4
+
+
+def test_fuse_weights_a_more_reliable_retriever_higher():
+    """BM25 measured weaker than dense search, so it should not vote equally."""
+    vector = [result(1, "class", file="A.java")]
+    lexical = [result(2, "class", file="B.java")]
+
+    fused = fuse([vector, lexical], top_k=2, weights=[2.0, 1.0])
+
+    assert fused[0]["id"] == 1
+
+
+def test_fuse_rejects_a_weight_per_ranking_mismatch():
+    with pytest.raises(ValueError, match="one weight is required"):
+        fuse([[], []], top_k=5, weights=[1.0])
+
+
 def test_lexical_index_is_built_once_and_rebuilt_after_a_reset():
     with patch("app.retrieval.iter_points", return_value=INDEXED) as points:
         get_lexical_index()

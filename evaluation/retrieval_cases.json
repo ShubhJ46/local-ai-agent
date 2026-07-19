@@ -190,5 +190,347 @@
     "category": "model",
     "question": "How does the project support compiling to a GraalVM native image?",
     "expected_file": "PetClinicRuntimeHints.java"
+  },
+  {
+    "id": "ep-owner-find-form",
+    "category": "endpoint",
+    "question": "Where is the search form for finding an owner shown?",
+    "expected_file": "OwnerController.java",
+    "expected_name": "initFindForm"
+  },
+  {
+    "id": "ep-owner-edit-form",
+    "category": "endpoint",
+    "question": "Which handler displays the form for editing an existing owner?",
+    "expected_file": "OwnerController.java",
+    "expected_name": "initUpdateOwnerForm"
+  },
+  {
+    "id": "ep-pet-edit-form",
+    "category": "endpoint",
+    "question": "Which handler renders the form used to change a pet's details?",
+    "expected_file": "PetController.java",
+    "expected_name": "initUpdateForm"
+  },
+  {
+    "id": "data-owner-by-surname",
+    "category": "data",
+    "question": "How are owners looked up by the beginning of their surname?",
+    "expected_file": "OwnerRepository.java",
+    "expected_name": "findByLastNameStartingWith"
+  },
+  {
+    "id": "data-owner-by-id",
+    "category": "data",
+    "question": "How is a single owner fetched by its identifier?",
+    "expected_file": "OwnerRepository.java",
+    "expected_name": "findById"
+  },
+  {
+    "id": "data-pet-types-ordered",
+    "category": "data",
+    "question": "How is the list of animal types read back in alphabetical order?",
+    "expected_file": "PetTypeRepository.java",
+    "expected_name": "findPetTypes"
+  },
+  {
+    "id": "data-vets-page",
+    "category": "data",
+    "question": "How is one page of veterinarians loaded from storage?",
+    "expected_file": "VetRepository.java",
+    "expected_name": "findAll"
+  },
+  {
+    "id": "data-handwritten-query",
+    "category": "data",
+    "question": "Where is a hand-written query used instead of a derived one?",
+    "expected_file": "PetTypeRepository.java"
+  },
+  {
+    "id": "model-owner-add-pet",
+    "category": "model",
+    "question": "How is a newly created animal attached to its owner?",
+    "expected_file": "Owner.java",
+    "expected_name": "addPet"
+  },
+  {
+    "id": "model-owner-lookup-pet",
+    "category": "model",
+    "question": "How do you find one of an owner's animals by its name?",
+    "expected_file": "Owner.java",
+    "expected_name": "getPet"
+  },
+  {
+    "id": "model-owner-address",
+    "category": "model",
+    "question": "Where is the street address of an owner stored?",
+    "expected_file": "Owner.java"
+  },
+  {
+    "id": "model-owner-phone",
+    "category": "model",
+    "question": "Where is an owner's contact telephone number kept?",
+    "expected_file": "Owner.java"
+  },
+  {
+    "id": "model-pet-add-visit",
+    "category": "model",
+    "question": "How is an appointment recorded against an animal?",
+    "expected_file": "Pet.java",
+    "expected_name": "addVisit"
+  },
+  {
+    "id": "model-pet-species",
+    "category": "model",
+    "question": "How is the species of an animal represented?",
+    "expected_file": "Pet.java"
+  },
+  {
+    "id": "model-vet-count-specialities",
+    "category": "model",
+    "question": "How is the number of areas a vet specialises in obtained?",
+    "expected_file": "Vet.java",
+    "expected_name": "getNrOfSpecialties"
+  },
+  {
+    "id": "model-vet-add-speciality",
+    "category": "model",
+    "question": "How is a new area of expertise assigned to a vet?",
+    "expected_file": "Vet.java",
+    "expected_name": "addSpecialty"
+  },
+  {
+    "id": "model-vet-internal-set",
+    "category": "model",
+    "question": "Where is the underlying collection of a vet's expertise exposed to the persistence layer?",
+    "expected_file": "Vet.java",
+    "expected_name": "getSpecialtiesInternal"
+  },
+  {
+    "id": "model-vets-wrapper-list",
+    "category": "model",
+    "question": "Where is the collection of vets exposed for serialisation?",
+    "expected_file": "Vets.java",
+    "expected_name": "getVetList"
+  },
+  {
+    "id": "model-entity-is-saved",
+    "category": "model",
+    "question": "How does the code tell whether a record has been persisted yet?",
+    "expected_file": "BaseEntity.java",
+    "expected_name": "isNew"
+  },
+  {
+    "id": "model-named-tostring",
+    "category": "model",
+    "question": "How is an entity's display name used for its text representation?",
+    "expected_file": "NamedEntity.java",
+    "expected_name": "toString"
+  },
+  {
+    "id": "model-person-surname",
+    "category": "model",
+    "question": "Where is a person's family name stored?",
+    "expected_file": "Person.java"
+  },
+  {
+    "id": "model-visit-description",
+    "category": "model",
+    "question": "Where is the free-text note about an appointment kept?",
+    "expected_file": "Visit.java"
+  },
+  {
+    "id": "config-cache-customizer",
+    "category": "config",
+    "question": "Where is the cache manager adjusted when the application starts?",
+    "expected_file": "CacheConfiguration.java",
+    "expected_name": "petclinicCacheConfigurationCustomizer"
+  },
+  {
+    "id": "config-cache-settings",
+    "category": "config",
+    "question": "Where are cache statistics turned on?",
+    "expected_file": "CacheConfiguration.java",
+    "expected_name": "cacheConfiguration"
+  },
+  {
+    "id": "config-register-interceptor",
+    "category": "config",
+    "question": "How is the language-switching interceptor registered with the web layer?",
+    "expected_file": "WebConfiguration.java",
+    "expected_name": "addInterceptors"
+  },
+  {
+    "id": "config-default-language",
+    "category": "config",
+    "question": "Where is the fallback language of the application decided?",
+    "expected_file": "WebConfiguration.java",
+    "expected_name": "localeResolver"
+  },
+  {
+    "id": "config-native-hints",
+    "category": "config",
+    "question": "Where are reflection hints declared for ahead-of-time compilation?",
+    "expected_file": "PetClinicRuntimeHints.java",
+    "expected_name": "registerHints"
+  },
+  {
+    "id": "config-startup",
+    "category": "config",
+    "question": "Where does the application actually boot?",
+    "expected_file": "PetClinicApplication.java",
+    "expected_name": "main"
+  },
+  {
+    "id": "method-pagination-attributes",
+    "category": "method",
+    "question": "Where are the page count and total results put onto the view model for owners?",
+    "expected_file": "OwnerController.java",
+    "expected_name": "addPaginationModel"
+  },
+  {
+    "id": "method-owner-page-query",
+    "category": "method",
+    "question": "How is a page of owners fetched when someone searches by surname?",
+    "expected_file": "OwnerController.java",
+    "expected_name": "findPaginatedForOwnersLastName"
+  },
+  {
+    "id": "method-owner-preload",
+    "category": "method",
+    "question": "How is the owner resolved before each request in the owner controller?",
+    "expected_file": "OwnerController.java",
+    "expected_name": "findOwner"
+  },
+  {
+    "id": "method-populate-types",
+    "category": "method",
+    "question": "How is the drop-down of animal types filled in for the form?",
+    "expected_file": "PetController.java",
+    "expected_name": "populatePetTypes"
+  },
+  {
+    "id": "method-resolve-pet",
+    "category": "method",
+    "question": "How is an animal resolved from the identifiers in the URL?",
+    "expected_file": "PetController.java",
+    "expected_name": "findPet"
+  },
+  {
+    "id": "method-block-id-binding",
+    "category": "method",
+    "question": "How is the identifier field prevented from being set directly by a request?",
+    "expected_file": "OwnerController.java",
+    "expected_name": "setAllowedFields"
+  },
+  {
+    "id": "method-visit-preload",
+    "category": "method",
+    "question": "How are the animal and its owner loaded before an appointment is booked?",
+    "expected_file": "VisitController.java",
+    "expected_name": "loadPetWithVisit"
+  },
+  {
+    "id": "method-earliest-visit",
+    "category": "method",
+    "question": "Where is the earliest date an appointment may be booked for defined?",
+    "expected_file": "VisitController.java",
+    "expected_name": "minVisitDate"
+  },
+  {
+    "id": "method-validate-pet",
+    "category": "method",
+    "question": "Where are an animal's name and date of birth checked for mistakes?",
+    "expected_file": "PetValidator.java",
+    "expected_name": "validate"
+  },
+  {
+    "id": "method-validator-supports",
+    "category": "method",
+    "question": "How does a validator declare which type it applies to?",
+    "expected_file": "PetValidator.java",
+    "expected_name": "supports"
+  },
+  {
+    "id": "method-render-type",
+    "category": "method",
+    "question": "How is an animal type turned into text for display in a form?",
+    "expected_file": "PetTypeFormatter.java",
+    "expected_name": "print"
+  },
+  {
+    "id": "method-parse-type",
+    "category": "method",
+    "question": "How is text typed by a user converted back into an animal type?",
+    "expected_file": "PetTypeFormatter.java",
+    "expected_name": "parse"
+  },
+  {
+    "id": "method-vet-page",
+    "category": "method",
+    "question": "How is a page of vets assembled for the listing screen?",
+    "expected_file": "VetController.java",
+    "expected_name": "findPaginated"
+  },
+  {
+    "id": "method-vet-pagination-attributes",
+    "category": "method",
+    "question": "Where are paging attributes added to the model for the vet listing?",
+    "expected_file": "VetController.java",
+    "expected_name": "addPaginationModel"
+  },
+  {
+    "id": "cls-owner-controller",
+    "category": "class",
+    "question": "Which class handles web requests to do with owners?",
+    "expected_file": "OwnerController.java",
+    "expected_name": "OwnerController"
+  },
+  {
+    "id": "cls-pet-controller",
+    "category": "class",
+    "question": "Which class deals with the animals belonging to an owner?",
+    "expected_file": "PetController.java",
+    "expected_name": "PetController"
+  },
+  {
+    "id": "cls-visit-controller",
+    "category": "class",
+    "question": "Where are requests about clinic appointments handled?",
+    "expected_file": "VisitController.java",
+    "expected_name": "VisitController"
+  },
+  {
+    "id": "cls-vet-model",
+    "category": "class",
+    "question": "Where is a veterinarian modelled as a domain object?",
+    "expected_file": "Vet.java",
+    "expected_name": "Vet"
+  },
+  {
+    "id": "cls-pet-type-entity",
+    "category": "class",
+    "question": "Where is the kind of animal defined as a persisted entity?",
+    "expected_file": "PetType.java",
+    "expected_name": "PetType"
+  },
+  {
+    "id": "cls-visit-entity",
+    "category": "class",
+    "question": "Which entity represents a single appointment at the clinic?",
+    "expected_file": "Visit.java",
+    "expected_name": "Visit"
+  },
+  {
+    "id": "file-mysql-schema",
+    "category": "file",
+    "question": "Where are the instructions for running against MySQL?",
+    "expected_file": "petclinic_db_setup_mysql.txt"
+  },
+  {
+    "id": "file-postgres-schema",
+    "category": "file",
+    "question": "Where is the PostgreSQL setup documented?",
+    "expected_file": "petclinic_db_setup_postgres.txt"
   }
 ]

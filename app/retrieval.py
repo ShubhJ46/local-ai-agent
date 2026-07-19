@@ -18,6 +18,19 @@ from app.vector_store import iter_points, search
 # so a result both retrievers like beats one that either ranks first alone.
 RRF_K = 60
 
+# The two retrievers are not equally reliable on code. Measured independently
+# over the 80-case evaluation set, dense search reaches 63.7% Recall@5 against
+# BM25's 38.8%, and fusing them as equals dragged the combination *below* dense
+# search alone. Weighting each retriever by how much it has earned is the fix.
+VECTOR_WEIGHT = 2.0
+LEXICAL_WEIGHT = 1.0
+
+# Cap on results from any single file. Without it the dense retriever routinely
+# filled all five slots with chunks of one class, hiding the file that actually
+# answered the question. A code navigator that returns five pieces of the same
+# file has not really returned five results.
+MAX_PER_FILE = 3
+
 # A question about behaviour is usually answered by a handler, not by the class
 # that contains it or the file that contains that. Applied after fusion so it
 # breaks ties without overriding a strong agreement between retrievers.
@@ -80,15 +93,24 @@ def type_priority(result: dict) -> int:
     return TYPE_PRIORITY.get(result.get("type"), 0)
 
 
-def fuse(rankings: list[list[dict]], top_k: int) -> list[dict]:
-    """Combine ranked result lists with reciprocal rank fusion."""
+def fuse(
+    rankings: list[list[dict]],
+    top_k: int,
+    weights: list[float] | None = None,
+    max_per_file: int | None = MAX_PER_FILE,
+) -> list[dict]:
+    """Combine ranked result lists with weighted reciprocal rank fusion."""
+    weights = weights if weights is not None else [1.0] * len(rankings)
+    if len(weights) != len(rankings):
+        raise ValueError("one weight is required per ranking")
+
     scores: dict[object, float] = {}
     documents: dict[object, dict] = {}
 
-    for ranking in rankings:
+    for ranking, weight in zip(rankings, weights, strict=True):
         for rank, result in enumerate(ranking, start=1):
             identifier = result["id"]
-            scores[identifier] = scores.get(identifier, 0.0) + 1.0 / (RRF_K + rank)
+            scores[identifier] = scores.get(identifier, 0.0) + weight / (RRF_K + rank)
             documents.setdefault(identifier, result)
 
     ranked = sorted(
@@ -98,7 +120,31 @@ def fuse(rankings: list[list[dict]], top_k: int) -> list[dict]:
         ),
         reverse=True,
     )
-    return ranked[:top_k]
+    return _limit_per_file(ranked, top_k, max_per_file)
+
+
+def _limit_per_file(ranked: list[dict], top_k: int, max_per_file: int | None) -> list[dict]:
+    """Take the top_k, allowing at most max_per_file results from one file.
+
+    Applied after scoring, so it changes which results are shown without
+    disturbing the order they were ranked in.
+    """
+    if max_per_file is None:
+        return ranked[:top_k]
+
+    selected: list[dict] = []
+    seen: dict[object, int] = {}
+
+    for result in ranked:
+        file_name = result.get("file")
+        if file_name is not None and seen.get(file_name, 0) >= max_per_file:
+            continue
+        seen[file_name] = seen.get(file_name, 0) + 1
+        selected.append(result)
+        if len(selected) == top_k:
+            break
+
+    return selected
 
 
 def lexical_search(query: str, top_k: int = 5) -> list[dict]:
@@ -121,4 +167,5 @@ def hybrid_search(query: str, top_k: int = 5) -> list[dict]:
     return fuse(
         [vector_search(query, candidate_k), lexical_search(query, candidate_k)],
         top_k=top_k,
+        weights=[VECTOR_WEIGHT, LEXICAL_WEIGHT],
     )
