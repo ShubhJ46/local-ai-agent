@@ -95,14 +95,15 @@ Python functions and Spring Java controllers receive structured metadata. C/C++,
 
 ```bash
 ruff check .
-pytest
+pytest --cov
 ./scripts/fetch_eval_corpus.sh
 python3 -m scripts.evaluate_retrieval .eval-corpus/spring-petclinic/src/main
 ```
 
-Tests are fully offline — Ollama calls are mocked — so `ruff` and `pytest` gate
-CI. The evaluation command needs a running Ollama and reports Recall@k and MRR
-per retriever and per question category.
+83 tests, fully offline — Ollama calls are mocked — so `ruff` and `pytest` gate
+CI across Python 3.10, 3.11 and 3.12, with coverage held at 75%. The evaluation
+command needs a running Ollama and reports Recall@k and MRR per retriever and
+per question category.
 
 ## Known limitations
 
