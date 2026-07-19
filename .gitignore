@@ -11,3 +11,7 @@ qdrant_data/
 
 # Evaluation corpora are fetched on demand, never vendored.
 .eval-corpus/
+
+# Build and coverage artefacts
+*.egg-info/
+.coverage
