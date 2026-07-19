@@ -82,8 +82,13 @@ def main() -> None:
 
     cases = json.loads(Path(args.cases).read_text())
     print(f"Indexing {args.source} ...")
-    chunk_count = ingest_codebase(args.source)
-    print(f"Indexed {chunk_count} chunks. Evaluating {len(cases)} cases at k={args.top_k}.\n")
+    # Always index from scratch: a metric compared against a previous run is
+    # only meaningful if the corpus was built the same way both times.
+    summary = ingest_codebase(args.source, full=True)
+    print(
+        f"Indexed {summary['indexed']} chunks from {summary['files_total']} files. "
+        f"Evaluating {len(cases)} cases at k={args.top_k}.\n"
+    )
 
     outcomes = evaluate(cases, args.top_k)
 

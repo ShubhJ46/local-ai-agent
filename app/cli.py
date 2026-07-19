@@ -4,6 +4,11 @@ from app.ingest.ingest import ingest_codebase
 from app.vector_store import close_client
 
 
+def _report_progress(done: int, total: int) -> None:
+    """Overwrite a single line: indexing a large repository is not instant."""
+    print(f"\r  embedding {done}/{total} chunks...", end="", flush=True)
+
+
 def main():
     print("🧠 Local AI Code Agent")
     print("Commands:")
@@ -26,8 +31,16 @@ def main():
         if query.startswith("load "):
             path = query.replace("load ", "").strip()
             try:
-                count = ingest_codebase(path)
-                print(f"\n✅ Indexed {count} chunks from {path}\n")
+                summary = ingest_codebase(path, progress=_report_progress)
+                print(f"\r{' ' * 40}\r", end="")
+                if summary["indexed"]:
+                    print(
+                        f"\n✅ Indexed {summary['indexed']} chunks from "
+                        f"{summary['files_changed']} changed file(s); "
+                        f"{summary['files_total']} file(s) known.\n"
+                    )
+                else:
+                    print(f"\n✅ Already up to date ({summary['files_total']} files).\n")
             except (LocalAgentError, ValueError) as error:
                 print(f"\nError: {error}\n")
             continue

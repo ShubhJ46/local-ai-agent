@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 from app.parsers.code_parser import extract_python_functions
@@ -30,6 +31,10 @@ def load_documents(folder_path: str) -> list[dict]:
         content = path.read_text(encoding="utf-8", errors="ignore")
         file = path.name
         path_string = str(path)
+        # Hash the file, not the extracted unit: a class's own text is unchanged
+        # by an edit elsewhere in the file, so hashing the unit would make
+        # incremental indexing miss real changes.
+        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
         if path.suffix == ".java":
             entities = extract_spring_entities(content)
@@ -44,6 +49,7 @@ def load_documents(folder_path: str) -> list[dict]:
                         "metadata": {
                             "file_name": file,
                             "path": path_string,
+                            "file_hash": digest,
                             "type": "class",
                             "name": entity["name"],
                             "class": entity["name"],
@@ -71,6 +77,7 @@ def load_documents(folder_path: str) -> list[dict]:
                         "metadata": {
                             "file_name": file,
                             "path": path_string,
+                            "file_hash": digest,
                             "type": document_type,
                             "name": ent["name"],
                             "class": current_class,
@@ -90,6 +97,7 @@ def load_documents(folder_path: str) -> list[dict]:
                         "metadata": {
                             "file_name": file,
                             "path": path_string,
+                            "file_hash": digest,
                             "type": "function",
                             "name": func["name"],
                             "start_line": func.get("start_line"),
@@ -101,7 +109,12 @@ def load_documents(folder_path: str) -> list[dict]:
             documents.append(
                 {
                     "content": content,
-                    "metadata": {"file_name": file, "path": path_string, "type": "file"},
+                    "metadata": {
+                        "file_name": file,
+                        "path": path_string,
+                        "file_hash": digest,
+                        "type": "file",
+                    },
                 }
             )
 

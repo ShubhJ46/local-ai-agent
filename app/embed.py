@@ -44,6 +44,41 @@ def _embed(text: str) -> list[float]:
     return embedding
 
 
+def get_embeddings(texts: list[str]) -> list[list[float]]:
+    """Embed several texts in one request.
+
+    Indexing is dominated by request overhead rather than by the model, so
+    batching is worth roughly 3x. Older Ollama builds predate /api/embed, so a
+    404 falls back to embedding one at a time rather than failing the ingest.
+    """
+    if not texts:
+        return []
+    if any(not text or not text.strip() for text in texts):
+        raise ValueError("Cannot embed empty text")
+
+    try:
+        response = requests.post(
+            f"{settings.ollama_base_url}/api/embed",
+            json={"model": settings.embedding_model, "input": texts},
+            timeout=settings.request_timeout_seconds,
+        )
+        if response.status_code == 404:
+            return [get_embedding(text) for text in texts]
+        response.raise_for_status()
+        embeddings = response.json().get("embeddings")
+    except (requests.RequestException, ValueError) as error:
+        raise OllamaError(
+            "Could not get embeddings from Ollama. Start Ollama with `ollama serve` "
+            f"and pull `{settings.embedding_model}`."
+        ) from error
+
+    if not isinstance(embeddings, list) or len(embeddings) != len(texts):
+        raise OllamaError(
+            f"Ollama returned {len(embeddings or [])} embeddings for {len(texts)} inputs."
+        )
+    return embeddings
+
+
 if __name__ == "__main__":
     e1 = get_embedding("login system")
     e2 = get_embedding("authentication module")

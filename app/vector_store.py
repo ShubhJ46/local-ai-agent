@@ -1,3 +1,5 @@
+import uuid
+
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -15,27 +17,103 @@ client = QdrantClient(path=settings.vector_store_path)
 COLLECTION_NAME = "documents"
 
 
-def init_collection(vector_size: int) -> None:
-    """Create a fresh index. Re-indexing intentionally replaces prior contents."""
-    client.recreate_collection(
-        collection_name=COLLECTION_NAME,
-        vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+# Fixed namespace so a chunk keeps the same id across runs and machines.
+POINT_NAMESPACE = uuid.UUID("6f9f3a52-1f0e-5c7a-9a1d-0d5b3f9c4e21")
+
+UPSERT_BATCH_SIZE = 256
+
+
+def point_id(metadata: dict) -> str:
+    """Derive a stable id from what identifies a chunk.
+
+    Positional ids were only safe while ingest wrote the whole corpus in one
+    call. Writing in batches, or re-indexing a single changed file, would
+    otherwise overwrite unrelated chunks or duplicate the same one.
+    """
+    key = "|".join(
+        str(metadata.get(field) or "") for field in ("path", "type", "name", "part")
+    )
+    return str(uuid.uuid5(POINT_NAMESPACE, key))
+
+
+def collection_exists() -> bool:
+    return any(
+        collection.name == COLLECTION_NAME for collection in client.get_collections().collections
     )
 
 
-def store_embeddings(chunks: list[dict]) -> None:
-    points = []
+def init_collection(vector_size: int, reset: bool = False) -> None:
+    """Ensure the collection exists, keeping its contents unless asked otherwise."""
+    if reset and collection_exists():
+        client.delete_collection(collection_name=COLLECTION_NAME)
 
-    for i, chunk in enumerate(chunks):
-        points.append(
-            PointStruct(
-                id=i,
-                vector=chunk["embedding"],
-                payload={"text": chunk["text"], "metadata": chunk["metadata"]},
-            )
+    if not collection_exists():
+        client.create_collection(
+            collection_name=COLLECTION_NAME,
+            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
         )
 
-    client.upsert(collection_name=COLLECTION_NAME, points=points)
+
+def store_embeddings(chunks: list[dict]) -> None:
+    points = [
+        PointStruct(
+            id=point_id(chunk["metadata"]),
+            vector=chunk["embedding"],
+            payload={"text": chunk["text"], "metadata": chunk["metadata"]},
+        )
+        for chunk in chunks
+    ]
+
+    for start in range(0, len(points), UPSERT_BATCH_SIZE):
+        client.upsert(
+            collection_name=COLLECTION_NAME,
+            points=points[start : start + UPSERT_BATCH_SIZE],
+        )
+
+
+def indexed_file_hashes() -> dict[str, str]:
+    """Return the content hash recorded for each indexed file path.
+
+    Used to decide what actually needs re-embedding. Files indexed before
+    hashes were recorded simply compare unequal and are refreshed.
+    """
+    if not collection_exists():
+        return {}
+
+    hashes: dict[str, str] = {}
+    offset = None
+    while True:
+        batch, offset = client.scroll(
+            collection_name=COLLECTION_NAME,
+            limit=1024,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+        for point in batch:
+            metadata = (point.payload or {}).get("metadata", {})
+            path, digest = metadata.get("path"), metadata.get("file_hash")
+            if path and digest:
+                hashes[path] = digest
+        if offset is None:
+            break
+    return hashes
+
+
+def delete_files(paths: set[str]) -> None:
+    """Remove every point belonging to the given files."""
+    if not paths or not collection_exists():
+        return
+
+    client.delete(
+        collection_name=COLLECTION_NAME,
+        points_selector=Filter(
+            should=[
+                FieldCondition(key="metadata.path", match=MatchValue(value=path))
+                for path in sorted(paths)
+            ]
+        ),
+    )
 
 
 def close_client():

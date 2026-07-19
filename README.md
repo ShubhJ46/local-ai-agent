@@ -10,6 +10,7 @@ A local-first codebase assistant that indexes source code with AST-aware metadat
 - Answers through a bounded tool-use loop that is grounded on retrieved source before it may reply.
 - Remembers both the current conversation and, in Qdrant, exchanges from earlier sessions.
 - Verifies every file the answer cites against what was actually retrieved, and flags what was not.
+- Indexes incrementally: unchanged files are skipped, changed files re-embedded, deleted files removed.
 - Provides a terminal workflow for indexing a repository and asking questions.
 - Includes offline tests, linting, CI, and a versioned retrieval evaluation harness.
 
@@ -106,8 +107,6 @@ per retriever and per question category.
 ## Known limitations
 
 - Only Python and Java have AST extractors. C/C++, JavaScript, TypeScript, Markdown, and text files are indexed as whole-file documents.
-- Embedding is one request per chunk, so first-time indexing of a large repository is slow.
-- Re-indexing replaces the collection, so only one codebase is searchable at a time.
 - The BM25 index is held in memory and rebuilt from the vector store on first query.
 - Answer quality is bounded by the local model. Citations are checked against the retrieved source, so an invented file name is flagged rather than presented as fact, but the surrounding prose is still only as good as the model; see "Choosing a model" below.
 
@@ -137,7 +136,6 @@ would otherwise be embedded several times per question.
 
 ## Roadmap
 
-- Batched, incremental indexing keyed on content hashes.
 - Call graph extraction (controller -> service -> repository).
 - Line-range citations surfaced in the answer text, not just in retrieval metadata.
 - More language extractors and a browser UI.
