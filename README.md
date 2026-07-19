@@ -210,7 +210,7 @@ coverage held at 75%.
 
 - Only Python and Java have AST extractors, and Python extracts functions but not classes. C/C++, JavaScript, TypeScript, Markdown and text files are indexed whole.
 - The BM25 index is held in memory and rebuilt from the vector store on first query.
-- The Qdrant client takes an exclusive lock on the index directory, so the CLI and the HTTP API cannot run at the same time.
+- Embedded Qdrant locks its directory, so one index serves one process at a time. Set `QDRANT_URL` to point at a Qdrant server (the compose file runs one) if you want the CLI and the HTTP API at once.
 - Answer quality is bounded by the local model. Citations are verified, so an invented file name is flagged rather than asserted, but the surrounding prose is only as good as the model — see below.
 
 ### Choosing a model

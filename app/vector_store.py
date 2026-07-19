@@ -12,7 +12,26 @@ from qdrant_client.models import (
 
 from app.config import settings
 
-client = QdrantClient(path=settings.vector_store_path)
+_client: QdrantClient | None = None
+
+
+def get_client() -> QdrantClient:
+    """Return the shared client, connecting on first use.
+
+    Constructing this at import time took an exclusive lock on the index
+    directory as a side effect of importing the module, which broke unrelated
+    processes and made tests depend on whatever else happened to be running.
+    """
+    global _client
+    if _client is None:
+        if settings.qdrant_url:
+            # Server mode: several processes can share one index, so the CLI and
+            # the HTTP API can run at the same time.
+            _client = QdrantClient(url=settings.qdrant_url)
+        else:
+            _client = QdrantClient(path=settings.vector_store_path)
+    return _client
+
 
 COLLECTION_NAME = "documents"
 
@@ -37,18 +56,17 @@ def point_id(metadata: dict) -> str:
 
 
 def collection_exists() -> bool:
-    return any(
-        collection.name == COLLECTION_NAME for collection in client.get_collections().collections
-    )
+    collections = get_client().get_collections().collections
+    return any(collection.name == COLLECTION_NAME for collection in collections)
 
 
 def init_collection(vector_size: int, reset: bool = False) -> None:
     """Ensure the collection exists, keeping its contents unless asked otherwise."""
     if reset and collection_exists():
-        client.delete_collection(collection_name=COLLECTION_NAME)
+        get_client().delete_collection(collection_name=COLLECTION_NAME)
 
     if not collection_exists():
-        client.create_collection(
+        get_client().create_collection(
             collection_name=COLLECTION_NAME,
             vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
         )
@@ -65,7 +83,7 @@ def store_embeddings(chunks: list[dict]) -> None:
     ]
 
     for start in range(0, len(points), UPSERT_BATCH_SIZE):
-        client.upsert(
+        get_client().upsert(
             collection_name=COLLECTION_NAME,
             points=points[start : start + UPSERT_BATCH_SIZE],
         )
@@ -83,7 +101,7 @@ def indexed_file_hashes() -> dict[str, str]:
     hashes: dict[str, str] = {}
     offset = None
     while True:
-        batch, offset = client.scroll(
+        batch, offset = get_client().scroll(
             collection_name=COLLECTION_NAME,
             limit=1024,
             offset=offset,
@@ -105,7 +123,7 @@ def delete_files(paths: set[str]) -> None:
     if not paths or not collection_exists():
         return
 
-    client.delete(
+    get_client().delete(
         collection_name=COLLECTION_NAME,
         points_selector=Filter(
             should=[
@@ -117,7 +135,11 @@ def delete_files(paths: set[str]) -> None:
 
 
 def close_client():
-    client.close()
+    """Close the connection and forget it, so a later call reconnects."""
+    global _client
+    if _client is not None:
+        _client.close()
+        _client = None
 
 
 def format_point(point_id, payload: dict) -> dict | None:
@@ -153,7 +175,7 @@ def iter_points() -> list[dict]:
     points = []
     offset = None
     while True:
-        batch, offset = client.scroll(
+        batch, offset = get_client().scroll(
             collection_name=COLLECTION_NAME,
             limit=256,
             offset=offset,
@@ -182,7 +204,7 @@ def search(
                 for key, value in metadata_filter.items()
             ]
         )
-    results = client.query_points(
+    results = get_client().query_points(
         collection_name=COLLECTION_NAME,
         query=query_embedding,
         limit=top_k,

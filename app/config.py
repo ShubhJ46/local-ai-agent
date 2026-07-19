@@ -15,6 +15,10 @@ class Settings:
     llm_model: str = os.getenv("LLM_MODEL", "qwen2.5-coder:3b")
     request_timeout_seconds: float = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "120"))
     vector_store_path: str = os.getenv("VECTOR_STORE_PATH", "./qdrant_data")
+    # Embedded Qdrant locks its directory, so only one process may use an index
+    # at a time. Point this at a Qdrant server to share one index between the
+    # CLI and the HTTP API.
+    qdrant_url: str = os.getenv("QDRANT_URL", "")
 
 
 settings = Settings()

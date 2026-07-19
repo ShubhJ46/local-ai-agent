@@ -26,12 +26,13 @@ def test_retrieve_memory_returns_stored_text():
     list, so long-term recall silently never worked.
     """
     points = Mock(points=[Mock(payload={"text": "Q: where is login\nA: auth.py"})])
+    client = Mock(query_points=Mock(return_value=points))
 
     with (
         patch("app.memory.memory_collection_exists", return_value=True),
         patch("app.memory.get_embedding", return_value=[0.1, 0.2]),
-        patch("app.memory.client.query_points", return_value=points) as query,
+        patch("app.memory.get_client", return_value=client),
     ):
         assert retrieve_memory("login") == ["Q: where is login\nA: auth.py"]
 
-    assert "query_filter" not in query.call_args.kwargs
+    assert "query_filter" not in client.query_points.call_args.kwargs

@@ -11,7 +11,7 @@ import uuid
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from app.embed import get_embedding
-from app.vector_store import client
+from app.vector_store import get_client
 
 MEMORY_COLLECTION = "memory"
 
@@ -37,14 +37,14 @@ class ShortTermMemory:
 def memory_collection_exists() -> bool:
     return any(
         collection.name == MEMORY_COLLECTION
-        for collection in client.get_collections().collections
+        for collection in get_client().get_collections().collections
     )
 
 
 def init_memory_collection(vector_size):
     """Create the long-term collection if it is missing. Safe to call repeatedly."""
     if not memory_collection_exists():
-        client.create_collection(
+        get_client().create_collection(
             collection_name=MEMORY_COLLECTION,
             vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
         )
@@ -56,7 +56,7 @@ def store_memory(text):
 
     point = PointStruct(id=str(uuid.uuid4()), vector=embedding, payload={"text": text})
 
-    client.upsert(collection_name=MEMORY_COLLECTION, points=[point])
+    get_client().upsert(collection_name=MEMORY_COLLECTION, points=[point])
 
 
 def retrieve_memory(query, top_k=3):
@@ -70,7 +70,7 @@ def retrieve_memory(query, top_k=3):
     if not memory_collection_exists():
         return []
 
-    results = client.query_points(
+    results = get_client().query_points(
         collection_name=MEMORY_COLLECTION,
         query=get_embedding(query),
         limit=top_k,
