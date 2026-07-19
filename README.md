@@ -63,6 +63,29 @@ costs a little on endpoint and method questions, where the answer is genuinely
 the fourth unit inside one large controller, and buys a great deal on data,
 class, and model questions that a single crowded file used to bury.
 
+### Tried and rejected: a cross-encoder reranker
+
+Retrieval finds the right code unit somewhere in its top 20 candidates **92.5%**
+of the time, but only puts it in the top 5 **66.2%** of the time, and ranks it
+first only 32.5% of the time. That gap is a ranking failure rather than a
+retrieval failure, and reranking is the textbook answer to it — so it was worth
+trying.
+
+Scoring the top candidates with a cross-encoder
+(`ms-marco-MiniLM-L-6-v2`), measured the same way, moved Recall@5 by **+1.2
+points** across the 80 questions and **lowered MRR by 0.029**; on the held-out
+half, recall did not move at all. The price would have been a `torch` and
+`sentence-transformers` dependency and about 235 ms per query.
+
+It was not shipped. The model is trained on natural-language web passages, and
+Java source — annotations, camelCase identifiers, boilerplate — is not that. It
+also discards the type priority and per-file diversity the pipeline has already
+established, which is why the ordering got worse rather than better.
+
+The headroom is real, so a reranker remains the most promising direction; the
+instrument has to be one that understands code. Recording the attempt because a
+change declined on evidence is worth as much as one adopted on it.
+
 ## Quick start
 
 Python 3.10+ and Ollama.
@@ -235,6 +258,7 @@ thing to fix. On a larger GPU, `qwen2.5-coder:7b` is a reasonable upgrade.
 
 ## Roadmap
 
+- A code-aware reranker, given the measured headroom above.
 - Python class extraction, to match the Java side.
 - Call graph extraction (controller -> service -> repository).
 - More language extractors.
