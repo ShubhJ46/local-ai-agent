@@ -96,6 +96,7 @@ def test_lexical_search_matches_words_inside_a_symbol():
 def test_hybrid_search_combines_both_retrievers():
     with (
         patch("app.retrieval.iter_points", return_value=INDEXED),
+        patch("app.retrieval.get_embedding", return_value=[0.1, 0.2]),
         patch("app.retrieval.search", return_value=[INDEXED[1]]) as vector,
     ):
         results = hybrid_search("owner repository", top_k=2)
