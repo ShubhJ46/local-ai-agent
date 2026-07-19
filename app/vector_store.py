@@ -1,20 +1,29 @@
 from qdrant_client import QdrantClient
-from qdrant_client.models import VectorParams, Distance, PointStruct
+from qdrant_client.models import (
+    Distance,
+    FieldCondition,
+    Filter,
+    MatchValue,
+    PointStruct,
+    VectorParams,
+)
 
-client = QdrantClient(path="./qdrant_data")
+from app.config import settings
+
+client = QdrantClient(path=settings.vector_store_path)
 
 COLLECTION_NAME = "documents"
 
-def init_collection(vector_size):
+
+def init_collection(vector_size: int) -> None:
+    """Create a fresh index. Re-indexing intentionally replaces prior contents."""
     client.recreate_collection(
         collection_name=COLLECTION_NAME,
-        vectors_config=VectorParams(
-            size=vector_size,
-            distance=Distance.COSINE
-        )
+        vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
     )
 
-def store_embeddings(chunks):
+
+def store_embeddings(chunks: list[dict]) -> None:
     points = []
 
     for i, chunk in enumerate(chunks):
@@ -22,26 +31,35 @@ def store_embeddings(chunks):
             PointStruct(
                 id=i,
                 vector=chunk["embedding"],
-                payload={
-                    "text": chunk["text"],
-                    "metadata": chunk["metadata"]
-                }
+                payload={"text": chunk["text"], "metadata": chunk["metadata"]},
             )
         )
 
-    client.upsert(
-        collection_name=COLLECTION_NAME,
-        points=points
-    )
+    client.upsert(collection_name=COLLECTION_NAME, points=points)
+
 
 def close_client():
     client.close()
 
-def     search(query_embedding, top_k=5, filter=None):
+
+def search(
+    query_embedding: list[float], top_k: int = 5, metadata_filter: dict | None = None
+) -> list[dict]:
+    if top_k <= 0:
+        raise ValueError("top_k must be positive")
+    query_filter = None
+    if metadata_filter:
+        query_filter = Filter(
+            must=[
+                FieldCondition(key=f"metadata.{key}", match=MatchValue(value=value))
+                for key, value in metadata_filter.items()
+            ]
+        )
     results = client.query_points(
         collection_name=COLLECTION_NAME,
         query=query_embedding,
-        limit=top_k * 3
+        limit=top_k,
+        query_filter=query_filter,
     ).points
 
     formatted = []
@@ -52,16 +70,6 @@ def     search(query_embedding, top_k=5, filter=None):
 
         if metadata.get("type") == "endpoint":
             if not metadata.get("endpoint"):
-                continue
-
-        # Optional filtering 
-        if filter:
-            skip = False
-            for k, v in filter.items():
-                if metadata.get(k) != v:
-                    skip = True
-                    break
-            if skip:
                 continue
 
         item = {
@@ -77,17 +85,4 @@ def     search(query_embedding, top_k=5, filter=None):
 
         formatted.append(item)
 
-    # Smart ranking
-    def score(x):
-        if x["type"] == "endpoint":
-            return 0
-        elif x["type"] in ("method", "function"):
-            return 1
-        elif x["type"] == "class":
-            return 2
-        else:
-            return 3
-
-    formatted.sort(key=score)
-
-    return formatted[:top_k]
+    return formatted

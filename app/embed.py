@@ -1,22 +1,31 @@
 import requests
 
-def get_embedding(text):
+from app.config import settings
+from app.errors import OllamaError
+
+
+def get_embedding(text: str) -> list[float]:
+    if not text or not text.strip():
+        raise ValueError("Cannot embed empty text")
+
     try:
         response = requests.post(
-            "http://localhost:11434/api/embeddings",
-            json={
-                "model": "nomic-embed-text",
-                "prompt": text
-            },
-            timeout=30
+            f"{settings.ollama_base_url}/api/embeddings",
+            json={"model": settings.embedding_model, "prompt": text},
+            timeout=settings.request_timeout_seconds,
         )
-
         response.raise_for_status()
-        return response.json()["embedding"]
+        embedding = response.json().get("embedding")
+    except (requests.RequestException, ValueError) as error:
+        raise OllamaError(
+            "Could not get an embedding from Ollama. Start Ollama with `ollama serve` "
+            f"and pull `{settings.embedding_model}`."
+        ) from error
 
-    except requests.exceptions.ConnectionError:
-        raise Exception("Ollama is not running. Start it with: ollama serve")
-    
+    if not isinstance(embedding, list) or not embedding:
+        raise OllamaError("Ollama returned a response without a non-empty embedding.")
+    return embedding
+
 
 if __name__ == "__main__":
     e1 = get_embedding("login system")
