@@ -1,194 +1,72 @@
-# 🧠 Local AI Code Agent (AST-Aware RAG)
+# Local AI Code Agent
 
-An intelligent codebase assistant that understands real-world backend systems using **AST parsing + RAG + tool-based reasoning**.
+A local-first codebase assistant that indexes source code with AST-aware metadata and answers questions with retrieved source context. It runs with Ollama and an embedded Qdrant store—no cloud API key required.
 
-This project goes beyond basic code search by extracting **structured semantics** (functions, classes, REST endpoints) and enabling **grounded answers** using a hybrid retrieval + agent pipeline.
+## What it does today
 
----
+- Extracts Python functions and Spring Java endpoint metadata with Tree-sitter.
+- Indexes supported source and text files into embedded Qdrant.
+- Retrieves relevant code with semantic search and lightweight metadata-aware reranking.
+- Sends retrieved source, paths, symbols, and endpoint details to a local LLM for grounded answers.
+- Provides a terminal workflow for indexing a repository and asking questions.
+- Includes offline tests, linting, CI, and a versioned retrieval evaluation harness.
 
-## 🚀 Features
-
-### 🔍 AST-Aware Code Understanding
-
-* Parses Python and Java using Tree-sitter
-* Extracts:
-
-  * Functions (Python)
-  * Classes & Methods (Java)
-  * REST Endpoints (`@GetMapping`, `@PostMapping`, etc.)
-* Builds structured metadata for retrieval
-
----
-
-### ⚡ Endpoint Intelligence (Spring Boot)
-
-* Detects:
-
-  * Controllers (`@RestController`)
-  * Base paths (`@RequestMapping`)
-  * HTTP methods (`GET`, `POST`, etc.)
-* Constructs full endpoints:
-
-  ```
-  /groups/{groupId}/settlements
-  ```
-
----
-
-### 🧠 RAG + Agent Hybrid Architecture
-
-* Retrieval-first (grounded answers)
-* Multi-step agent with tool usage:
-
-  * `search_documents`
-  * `read_file`
-  * `find_endpoint`
-* Falls back to tools only when necessary
-
----
-
-### 🎯 Smart Retrieval
-
-* Query rewriting (bridges natural language ↔ code)
-* Metadata-aware ranking:
-
-  * Endpoint > Method > Class
-* Keyword + semantic alignment
-
----
-
-### 🛡️ Hallucination Control
-
-* Forces answers from retrieved context
-* Prevents LLM from guessing when data is missing
-
----
-
-## 🏗️ Architecture
-
-```
-User Query
-   ↓
-Query Rewriting
-   ↓
-Embedding Search (Qdrant)
-   ↓
-AST-Enriched Context
-   ↓
-Agent (LLM + Tools)
-   ↓
-Final Answer
-```
-
----
-
-## 🛠️ Tech Stack
-
-* Python 3.10+
-* Tree-sitter (AST parsing)
-* Qdrant (vector database)
-* Local LLM (via Ollama)
-* Custom RAG + Agent pipeline
-
----
-
-## 📦 Setup
-
-### 1. Clone repo
-
-```bash
-git clone <your-repo-url>
-cd local-ai-agent
-```
-
-### 2. Create virtual environment
-
-```bash
-python -m venv venv
-source venv/bin/activate
-```
-
-### 3. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Start local model (Ollama)
-
-```bash
-ollama serve
-```
-
----
-
-## ▶️ Usage
-
-### Index a codebase
-
-```bash
-python -m app.cli
-load <path_to_codebase>
-```
-
-### Ask questions
+## Architecture
 
 ```text
+CLI question
+  -> query rewrite
+  -> Ollama embedding
+  -> Qdrant semantic retrieval
+  -> metadata reranking
+  -> source-grounded Ollama response
+```
+
+## Quick start
+
+Prerequisites: Python 3.10+ and [Ollama](https://ollama.com/).
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements-dev.txt
+ollama serve
+ollama pull nomic-embed-text
+ollama pull mistral
+python3 -m app.cli
+```
+
+In the CLI:
+
+```text
+load /absolute/path/to/a/codebase
 Where is authentication handled?
-What are the GET endpoints for settlements?
-Which controller handles group balances?
+exit
 ```
 
----
+Copy `.env.example` to `.env` to choose an Ollama endpoint, models, timeout, or local Qdrant directory.
 
-## 📌 Example Output
+## Supported inputs
 
-```
-GET endpoints for settlements:
+Python functions and Spring Java controllers receive structured metadata. C/C++, JavaScript, TypeScript, Markdown, and text files are currently indexed as file-level documents. The next technical milestone is adding AST extractors and symbol/chunk metadata for the remaining languages.
 
-- GET /groups/{groupId}/settlements
-  Method: getSettlements
-  File: SettlementController.java
+## Quality checks
 
-- GET /settlements/{groupId}
-  Method: getSettlements
-  File: SettlementQueryController.java
+```bash
+ruff check .
+pytest
+python3 -m scripts.evaluate_retrieval data
 ```
 
----
+The evaluation command reports Recall@k and MRR against `evaluation/retrieval_cases.json`. Add representative questions from a real target codebase before publishing any metrics.
 
-## 🔥 Key Innovations
+## Roadmap
 
-* AST-based chunking (not naive text splitting)
-* Endpoint-aware retrieval for backend systems
-* Query rewriting for code-language alignment
-* Hybrid RAG + tool-based agent loop
+- Hybrid lexical + vector retrieval with reciprocal-rank fusion.
+- Call graph extraction (controller -> service -> repository).
+- Precise citations with file and line ranges.
+- More language extractors and a browser UI.
 
----
+## Project story
 
-## 🚧 Future Improvements
-
-* Call graph extraction (Controller → Service → Repository)
-* Hybrid search (vector + keyword)
-* Intent classification (auto tool routing)
-* UI for interactive code exploration
-
----
-
-## 👨‍💻 Author
-
-Shubham Jain
-
----
-
-## ⭐ Why this project stands out
-
-Most RAG systems:
-
-* Treat code as plain text ❌
-
-This system:
-
-* Understands code structure ✅
-* Extracts semantics (endpoints, methods) ✅
-* Produces grounded, explainable answers ✅
+This project demonstrates practical retrieval-system engineering: parsing and metadata extraction, local model integration, vector indexing, deterministic evaluation, error handling, and a tested command-line product. It is intentionally local-first so the full workflow can be run and inspected without sending a codebase to a third-party API.
